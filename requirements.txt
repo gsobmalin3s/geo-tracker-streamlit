@@ -1,4 +1,4 @@
 streamlit>=1.30
-openai>=0.28
+openai>=1.0.0
 pandas>=1.5
 plotly>=5.5
