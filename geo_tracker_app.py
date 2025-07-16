@@ -164,8 +164,9 @@ if client["results"]:
     fig = px.bar(df, x="prompt", color="mención", title="Aparición de marca por prompt")
     st.plotly_chart(fig, use_container_width=True)
 
-    st.markdown("### 🧠 Recomendaciones SEO")
- for i, row in df.iterrows():
+# --- Recomendaciones SEO ---
+st.markdown("### 🧠 Recomendaciones SEO")
+for i, row in df.iterrows():
     with st.expander(f"Prompt {i+1}: {row['prompt'][:40]}..."):
         st.markdown(f"""**Respuesta IA:**\n\n{row['response'][:1200]}""")
         st.markdown("---")
