@@ -104,6 +104,7 @@ def login_screen():
                 st.session_state.authenticated = True
                 st.session_state.username = username
                 st.success(f"¡Bienvenido, {username}!")
+                st.experimental_set_query_params(page="dashboard")
                 st.rerun()
             else:
                 st.error("Usuario o contraseña incorrectos.")
@@ -127,7 +128,11 @@ def login_screen():
 # --- INICIO ---
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
-if st.session_state.authenticated:
-    st.switch_page("dashboard.py")  # Aquí debes crear un archivo separado llamado dashboard.py
+
+query_params = st.experimental_get_query_params()
+
+if st.session_state.authenticated and query_params.get("page") == ["dashboard"]:
+    import dashboard
+    dashboard.run()
 else:
     login_screen()
