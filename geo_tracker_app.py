@@ -55,9 +55,10 @@ def generar_pdf_informe(df, brand):
                              f"Posición: {row['position'] or '—'}\n"
                              f"Recomendación: {row['recommendation']}\n"
                              f"{'-'*50}")
-pdf_bytes = pdf.output(dest='S').encode('latin1')
-return BytesIO(pdf_bytes)
-
+    pdf_output = BytesIO()
+    pdf.output(pdf_output)
+    pdf_output.seek(0)
+    return pdf_output
 
 # --- AUTENTICACIÓN ---
 def login_screen():
