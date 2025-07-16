@@ -235,17 +235,3 @@ def geo_tracker_dashboard():
             st.metric("Menciones", f"{df['mention'].sum()} / {len(df)}")
         else:
             st.info("Ejecuta primero la simulación diaria.")
-
-# --- INICIO ---
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
-if st.session_state.authenticated:
-    geo_tracker_dashboard()
-else:
-    login_screen()
-"""
-
-with open("/mnt/data/geo_tracker_app.py", "w", encoding="utf-8") as f:
-    f.write(clean_code)
-
-"/mnt/data/geo_tracker_app.py"
