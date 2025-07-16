@@ -41,24 +41,38 @@ def get_keyword_matches(text, keywords):
     return [kw for kw in keywords if re.search(rf'\b{re.escape(kw.lower())}\b', text)]
 
 def generar_pdf_informe(df, brand):
+    from fpdf import FPDF
+    from io import BytesIO
+
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
     pdf.set_title(f"Informe de Visibilidad – {brand}")
     pdf.cell(200, 10, txt=f"Informe IA – {brand}", ln=True, align="C")
     pdf.ln(10)
+
     for i, row in df.iterrows():
-        pdf.multi_cell(0, 6, f"Prompt: {row['prompt']}\n"
-                             f"Mención: {'Sí' if row['mention'] else 'No'}\n"
-                             f"Enlace: {'Sí' if row['link'] else 'No'}\n"
-                             f"Palabras clave: {', '.join(row['matched_keywords'])}\n"
-                             f"Posición: {row['position'] or '—'}\n"
-                             f"Recomendación: {row['recommendation']}\n"
-                             f"{'-'*50}")
-    pdf_output = BytesIO()
-    pdf.output(pdf_output)
-    pdf_output.seek(0)
-    return pdf_output
+        prompt = row.get("prompt", "—")
+        mention = 'Sí' if row.get("mention") else 'No'
+        link = 'Sí' if row.get("link") else 'No'
+        matched = ', '.join(row.get("matched_keywords", [])) or '—'
+        position = row.get("position") or '—'
+        recommendation = row.get("recommendation", "No disponible")
+
+        content = (
+            f"Prompt: {prompt}\n"
+            f"Mención: {mention}\n"
+            f"Enlace: {link}\n"
+            f"Palabras clave: {matched}\n"
+            f"Posición: {position}\n"
+            f"Recomendación: {recommendation}\n"
+            f"{'-'*50}"
+        )
+        pdf.multi_cell(0, 6, content)
+
+    pdf_bytes = pdf.output(dest='S').encode('latin1')
+    return BytesIO(pdf_bytes)
+
 
 # --- AUTENTICACIÓN ---
 def login_screen():
