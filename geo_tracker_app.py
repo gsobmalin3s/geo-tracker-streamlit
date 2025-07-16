@@ -8,11 +8,14 @@ import os
 import openai
 import re
 
+# --- CONFIG GLOBAL ---
+st.set_page_config(page_title="GEO Tracker PRO", layout="wide")
+
 # --- RUTAS ---
 USER_DB = "data/users.json"
 os.makedirs("data", exist_ok=True)
 
-# --- Utilidades ---
+# --- UTILIDADES ---
 def load_users():
     if os.path.exists(USER_DB):
         with open(USER_DB, "r", encoding="utf-8") as f:
@@ -33,6 +36,7 @@ def get_keyword_matches(text, keywords):
     text = text.lower()
     return [kw for kw in keywords if re.search(rf'\b{re.escape(kw.lower())}\b', text)]
 
+# --- AUTENTICACIÓN ---
 def login_screen():
     st.title("🔐 GEO Tracker PRO")
     tab_login, tab_register = st.tabs(["Iniciar sesión", "Registrarse"])
@@ -66,8 +70,8 @@ def login_screen():
                 save_users(users)
                 st.success("Usuario creado. Ahora puedes iniciar sesión.")
 
+# --- DASHBOARD ---
 def geo_tracker_dashboard():
-    st.set_page_config(page_title="GEO Tracker PRO", layout="wide")
     users = load_users()
     user = st.session_state.username
 
@@ -114,7 +118,6 @@ def geo_tracker_dashboard():
     if selected_client not in clients:
         st.stop()
 
-    # --- CONFIGURACIÓN DEL CLIENTE ---
     client = clients[selected_client]
     st.sidebar.markdown("### ⚙️ Configuración")
     client["brand"] = st.sidebar.text_input("Marca", value=client.get("brand", ""))
@@ -126,21 +129,19 @@ def geo_tracker_dashboard():
         st.sidebar.image(favicon_url, width=32)
 
     st.sidebar.markdown("### 🔑 API Keys por cliente")
-    client["apis"]["openai"] = st.sidebar.text_input("OpenAI API Key", value=client["apis"].get("openai", ""), type="password")
-    save_users(users)
-
+    client["apis"]["openai"] = st.sidebar.text_input(
+        "OpenAI API Key", value=client["apis"].get("openai", ""), type="password"
+    )
     api_key = client["apis"]["openai"]
     model = st.sidebar.selectbox("Modelo GPT", ["gpt-4", "gpt-3.5-turbo"])
     run = st.sidebar.button("🚀 Consultar IA")
+    save_users(users)
 
-    # Palabras clave manuales
     st.markdown("### 🔑 Palabras clave principales")
-    keywords_str = st.text_area("Palabras clave (una por línea):", "
-".join(client.get("keywords", [])))
+    keywords_str = st.text_area("Palabras clave (una por línea):", "\n".join(client.get("keywords", [])))
     client["keywords"] = [kw.strip() for kw in keywords_str.splitlines() if kw.strip()]
     save_users(users)
 
-    # NUEVO: importar keywords desde CSV de Search Console
     st.markdown("### 📥 Importar palabras clave desde Search Console")
     uploaded_file = st.file_uploader("Sube un CSV exportado desde GSC", type=["csv"])
     if uploaded_file is not None:
@@ -148,11 +149,14 @@ def geo_tracker_dashboard():
             df_keywords = pd.read_csv(uploaded_file)
             if "Consulta" in df_keywords.columns:
                 new_keywords = df_keywords["Consulta"].dropna().unique().tolist()
-                client["keywords"].extend([kw for kw in new_keywords if kw not in client["keywords"]])
+                client["keywords"].extend(
+                    [kw for kw in new_keywords if kw not in client["keywords"]]
+                )
+                client["keywords"] = sorted(set(client["keywords"]))
                 st.success(f"{len(new_keywords)} palabras clave añadidas.")
                 save_users(users)
             else:
-                st.error("El archivo no tiene una columna 'Consulta'. ¿Has exportado correctamente desde GSC?")
+                st.error("El archivo no tiene una columna 'Consulta'.")
         except Exception as e:
             st.error(f"Error al leer el archivo: {e}")
 
@@ -170,8 +174,8 @@ def geo_tracker_dashboard():
 
     def call_openai(prompt):
         try:
-            client_oai = openai.OpenAI(api_key=api_key)
-            response = client_oai.chat.completions.create(
+            openai.api_key = api_key
+            response = openai.ChatCompletion.create(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7
@@ -182,10 +186,15 @@ def geo_tracker_dashboard():
             return None
 
     def generate_recommendation(prompt, brand, response):
-        analysis_prompt = f"Este es un análisis SEO para IA. Prompt original: '{prompt}'. Marca: '{brand}'. Respuesta de la IA: '{response[:1000]}'. ¿Qué debería mejorar esta marca para aparecer mejor posicionada en esta respuesta de IA? Da recomendaciones claras."
+        analysis_prompt = (
+            f"Este es un análisis SEO para IA. Prompt original: '{prompt}'. "
+            f"Marca: '{brand}'. Respuesta de la IA: '{response[:1000]}'. "
+            f"¿Qué debería mejorar esta marca para aparecer mejor posicionada en esta respuesta de IA? "
+            f"Da recomendaciones claras."
+        )
         try:
-            client_oai = openai.OpenAI(api_key=api_key)
-            rec_response = client_oai.chat.completions.create(
+            openai.api_key = api_key
+            rec_response = openai.ChatCompletion.create(
                 model=model,
                 messages=[{"role": "user", "content": analysis_prompt}],
                 temperature=0.7
@@ -215,7 +224,7 @@ def geo_tracker_dashboard():
                 link = "http" in response_lower
                 position = None
                 for i, line in enumerate(response.splitlines()):
-                    if any(re.search(rf'{re.escape(k)}', line.lower()) for k in keyword_matches) and line.strip().split(" ")[0].isdigit():
+                    if any(kw in line.lower() for kw in keyword_matches) and line.strip().split(" ")[0].isdigit():
                         position = i + 1
                         break
                 recommendation = generate_recommendation(p, client["brand"], response)
@@ -234,8 +243,8 @@ def geo_tracker_dashboard():
     if client["results"]:
         df = pd.DataFrame(client["results"])
         visibility = round(
-            (df["mention"].sum() * 50 + df["link"].sum() * 25 + df["position"].notna().sum() * 25) / (len(df) * 100) * 100,
-            1
+            (df["mention"].sum() * 50 + df["link"].sum() * 25 + df["position"].notna().sum() * 25)
+            / (len(df) * 100) * 100, 1
         )
 
         st.markdown("### 📊 Dashboard de Visibilidad")
@@ -256,10 +265,15 @@ def geo_tracker_dashboard():
         st.markdown("### 🧠 Recomendaciones SEO")
         for i, row in df.iterrows():
             with st.expander(f"Prompt {i+1}: {row['prompt'][:40]}..."):
-                st.markdown(f"**Respuesta IA:**
-
-{row['response'][:1200]}")
+                st.markdown(f"**Respuesta IA:**\n\n{row['response'][:1200]}")
                 st.markdown("---")
-                st.markdown(f"**Recomendación:**
+                st.markdown(f"**Recomendación:**\n\n{row['recommendation']}")
 
-{row['recommendation']}")
+# --- INICIO ---
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+if st.session_state.authenticated:
+    geo_tracker_dashboard()
+else:
+    login_screen()
