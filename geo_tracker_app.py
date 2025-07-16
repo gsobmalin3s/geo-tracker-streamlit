@@ -70,6 +70,13 @@ def geo_tracker_dashboard():
     st.set_page_config(page_title="GEO Tracker PRO", layout="wide")
     users = load_users()
     user = st.session_state.username
+    if user not in users:
+    st.error("Este usuario ya no existe. Por favor, cierra sesión y vuelve a entrar.")
+    if st.button("Cerrar sesión"):
+        st.session_state.authenticated = False
+        st.session_state.username = None
+        st.rerun()
+    st.stop()
     clients = users[user]["clients"]
 
     logo_path = "assets/logo-lin3s.jpg"
