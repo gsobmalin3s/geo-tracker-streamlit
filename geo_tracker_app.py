@@ -65,14 +65,9 @@ if selected_client not in st.session_state.clients:
 client = st.session_state.clients[selected_client]
 
 # --- PERFIL DEL CLIENTE ---
-st.markdown(f"## {client['brand']}")
-st.image(client["favicon"], width=32)
-st.markdown(
-    f"""**Dominio:** {client['domain']}  
+st.markdown(f"**Dominio:** {client['domain']}  
 **Sector:** {client['sector']}  
-**Descripción:** {client['description']}"""
-)
-
+**Descripción:** {client['description']}")
 
 # --- CONFIGURACIÓN ---
 st.sidebar.markdown("### ⚙️ Configuración")
@@ -105,7 +100,7 @@ def call_openai(prompt, key):
         return f"ERROR: {e}"
 
 def generate_recommendation(prompt, brand, response, key):
-    analysis_prompt = f"""Este es un análisis SEO para IA. Prompt original: "{prompt}". Marca: "{brand}". Respuesta de la IA: "{response[:1000]}". ¿Qué debería mejorar esta marca para aparecer mejor posicionada en esta respuesta de IA? Da recomendaciones claras."""
+    analysis_prompt = f"Este es un análisis SEO para IA. Prompt original: '{prompt}'. Marca: '{brand}'. Respuesta de la IA: '{response[:1000]}'. ¿Qué debería mejorar esta marca para aparecer mejor posicionada en esta respuesta de IA? Da recomendaciones claras."
     try:
         openai.api_key = key
         rec_response = openai.ChatCompletion.create(
@@ -120,7 +115,8 @@ def generate_recommendation(prompt, brand, response, key):
 if run and client["api_key"] and client["brand"]:
     client["results"] = []
     for p in client["prompts"]:
-        if not p.strip(): continue
+        if not p.strip():
+            continue
         response = call_openai(p, client["api_key"])
         mention = any(alias.lower() in response.lower() for alias in aliases)
         link = "http" in response and client["domain"] in response
@@ -156,7 +152,6 @@ if client["results"]:
     col4.metric("🌟 Índice Visibilidad", f"{visibility}/100")
 
     st.dataframe(df[["prompt", "mention", "link", "position", "timestamp"]])
-
     st.download_button("⬇️ Exportar CSV", data=df.to_csv(index=False), file_name=f"{selected_client}_resultados.csv")
 
     st.markdown("### 📈 Menciones por Prompt")
@@ -164,11 +159,9 @@ if client["results"]:
     fig = px.bar(df, x="prompt", color="mención", title="Aparición de marca por prompt")
     st.plotly_chart(fig, use_container_width=True)
 
-# --- Recomendaciones SEO ---
-st.markdown("### 🧠 Recomendaciones SEO")
-for i, row in df.iterrows():
-    with st.expander(f"Prompt {i+1}: {row['prompt'][:40]}..."):
-        st.markdown(f"**Respuesta IA:**\n\n{row['response'][:1200]}")
-        st.markdown("---")
-        st.markdown(f"**Recomendación:**\n\n{row['recommendation']}")
-
+    st.markdown("### 🧠 Recomendaciones SEO")
+    for i, row in df.iterrows():
+        with st.expander(f"Prompt {i+1}: {row['prompt'][:40]}..."):
+            st.markdown(f"**Respuesta IA:**\n\n{row['response'][:1200]}")
+            st.markdown("---")
+            st.markdown(f"**Recomendación:**\n\n{row['recommendation']}")
