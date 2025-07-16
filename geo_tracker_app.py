@@ -1,5 +1,7 @@
-# Debido al tamaño del script, escribimos el archivo en una segunda celda
-code = """
+# Limpiar el contenido, eliminando las líneas problemáticas que intentan escribir archivos desde el script.
+fixed_code = """
+# geo_tracker_app.py
+
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -35,7 +37,7 @@ def verify_password(password, hashed):
 
 def get_keyword_matches(text, keywords):
     text = text.lower()
-    return [kw for kw in keywords if re.search(rf'\\\\b{re.escape(kw.lower())}\\\\b', text)]
+    return [kw for kw in keywords if re.search(rf'\\b{re.escape(kw.lower())}\\b', text)]
 
 def simulate_ai_response(prompt, model_name):
     examples = {
@@ -73,12 +75,12 @@ def generar_pdf_informe(df, brand, conclusion):
     pdf.set_font("Arial", size=10)
     pdf.ln(10)
     for i, row in df.iterrows():
-        pdf.multi_cell(0, 6, f"Prompt: {row['prompt']}\\n"
-                             f"Mención: {'Sí' if row['mention'] else 'No'}\\n"
-                             f"Enlace: {'Sí' if row['link'] else 'No'}\\n"
-                             f"Palabras clave: {', '.join(row['matched_keywords'])}\\n"
-                             f"Posición: {row['position'] or '—'}\\n"
-                             f"Recomendación: {row['recommendation']}\\n"
+        pdf.multi_cell(0, 6, f"Prompt: {row['prompt']}\n"
+                             f"Mención: {'Sí' if row['mention'] else 'No'}\n"
+                             f"Enlace: {'Sí' if row['link'] else 'No'}\n"
+                             f"Palabras clave: {', '.join(row['matched_keywords'])}\n"
+                             f"Posición: {row['position'] or '—'}\n"
+                             f"Recomendación: {row['recommendation']}\n"
                              f"{'-'*50}")
     pdf.ln(8)
     pdf.set_font("Arial", style='B', size=12)
@@ -245,7 +247,8 @@ else:
     login_screen()
 """
 
-with open("/mnt/data/geo_tracker_app.py", "w", encoding="utf-8") as f:
-    f.write(code)
+# Guardar archivo limpio y listo
+with open("/mnt/data/geo_tracker_app_clean.py", "w", encoding="utf-8") as f:
+    f.write(fixed_code)
 
-"/mnt/data/geo_tracker_app.py"
+"/mnt/data/geo_tracker_app_clean.py"
