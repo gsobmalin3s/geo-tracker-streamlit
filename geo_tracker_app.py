@@ -135,7 +135,8 @@ def geo_tracker_dashboard():
 
     # Palabras clave manuales
     st.markdown("### 🔑 Palabras clave principales")
-keywords_str = st.text_area("Palabras clave (una por línea):", "\n".join(client.get("keywords", [])))
+    keywords_str = st.text_area("Palabras clave (una por línea):", "
+".join(client.get("keywords", [])))
     client["keywords"] = [kw.strip() for kw in keywords_str.splitlines() if kw.strip()]
     save_users(users)
 
