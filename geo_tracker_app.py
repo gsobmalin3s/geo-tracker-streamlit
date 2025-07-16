@@ -50,21 +50,13 @@ def generar_pdf_informe(df, brand):
     pdf.ln(10)
 
     for _, row in df.iterrows():
-        content = (
-            f"Prompt: {row.get('prompt', '—')}
-"
-            f"Mención: {'Sí' if row.get('mention') else 'No'}
-"
-            f"Enlace: {'Sí' if row.get('link') else 'No'}
-"
-            f"Palabras clave: {', '.join(row.get('matched_keywords', [])) or '—'}
-"
-            f"Posición: {row.get('position') or '—'}
-"
-            f"Recomendación: {row.get('recommendation', 'No disponible')}
-"
-            f"{'-'*50}"
-        )
+        content = f"""Prompt: {row.get('prompt', '—')}
+Mención: {'Sí' if row.get('mention') else 'No'}
+Enlace: {'Sí' if row.get('link') else 'No'}
+Palabras clave: {', '.join(row.get('matched_keywords', [])) or '—'}
+Posición: {row.get('position') or '—'}
+Recomendación: {row.get('recommendation', 'No disponible')}
+{'-'*50}"""
         pdf.multi_cell(0, 6, content)
 
     pdf_bytes = pdf.output(dest='S').encode('latin1')
