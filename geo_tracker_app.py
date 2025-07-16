@@ -65,8 +65,11 @@ if selected_client not in st.session_state.clients:
 client = st.session_state.clients[selected_client]
 
 # --- PERFIL DEL CLIENTE ---
-st.markdown(f"**Dominio:** {client['domain']}  \n**Sector:** {client['sector']}  \n**Descripción:** {client['description']}")
-
+st.markdown(f"## {client['brand']}")
+st.image(client["favicon"], width=32)
+st.markdown(f"**Dominio:** {client['domain']}  
+**Sector:** {client['sector']}  
+{client['description']}")
 
 # --- CONFIGURACIÓN ---
 st.sidebar.markdown("### ⚙️ Configuración")
@@ -161,6 +164,10 @@ if client["results"]:
     st.markdown("### 🧠 Recomendaciones SEO")
     for i, row in df.iterrows():
         with st.expander(f"Prompt {i+1}: {row['prompt'][:40]}..."):
-st.markdown(f"**Respuesta IA:**\n\n{row['response'][:1200]}")
-st.markdown("---")
-st.markdown(f"**Recomendación:**\n\n{row['recommendation']}")
+            st.markdown(f"**Respuesta IA:**
+
+{row['response'][:1200]}")
+            st.markdown("---")
+            st.markdown(f"**Recomendación:**
+
+{row['recommendation']}")
