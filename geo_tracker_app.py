@@ -8,6 +8,7 @@ import os
 import openai
 import re
 
+
 # --- CONFIG GLOBAL ---
 st.set_page_config(page_title="GEO Tracker PRO", layout="wide")
 
