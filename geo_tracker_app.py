@@ -1,17 +1,16 @@
 import streamlit as st
-import openai
 import pandas as pd
 import plotly.express as px
 import datetime
 import hashlib
 import json
 import os
+import openai
 
 # --- RUTAS ---
 USER_DB = "data/users.json"
 os.makedirs("data", exist_ok=True)
 
-# --- FUNCIONES UTILITARIAS ---
 def load_users():
     if os.path.exists(USER_DB):
         with open(USER_DB, "r", encoding="utf-8") as f:
@@ -28,11 +27,9 @@ def hash_password(password):
 def verify_password(password, hashed):
     return hash_password(password) == hashed
 
-# --- LOGIN ---
 def login_screen():
     st.title("🔐 GEO Tracker PRO")
     tab_login, tab_register = st.tabs(["Iniciar sesión", "Registrarse"])
-
     users = load_users()
 
     with tab_login:
@@ -63,10 +60,8 @@ def login_screen():
                 save_users(users)
                 st.success("Usuario creado. Ahora puedes iniciar sesión.")
 
-# --- DASHBOARD PRINCIPAL ---
 def geo_tracker_dashboard():
     st.set_page_config(page_title="GEO Tracker PRO", layout="wide")
-
     users = load_users()
     user = st.session_state.username
     clients = users[user]["clients"]
@@ -78,8 +73,8 @@ def geo_tracker_dashboard():
         st.sidebar.markdown("### GEO Tracker PRO")
 
     st.sidebar.markdown(f"👤 Usuario: `{user}`")
-
     st.sidebar.markdown("### 👥 Cliente")
+
     client_options = list(clients.keys())
     selected_client = st.sidebar.selectbox(
         "Selecciona cliente",
@@ -95,11 +90,7 @@ def geo_tracker_dashboard():
                 "domain": "",
                 "prompts": ["" for _ in range(4)],
                 "results": [],
-                "apis": {
-                    "openai": "",
-                    "gemini": None,
-                    "claude": None
-                }
+                "apis": {"openai": ""}
             }
             save_users(users)
             st.rerun()
@@ -108,7 +99,6 @@ def geo_tracker_dashboard():
         st.stop()
 
     client = clients[selected_client]
-
     st.sidebar.markdown("### ⚙️ Configuración")
     client["brand"] = st.sidebar.text_input("Marca", value=client.get("brand", ""))
     client["domain"] = st.sidebar.text_input("Dominio", value=client.get("domain", ""))
@@ -120,9 +110,6 @@ def geo_tracker_dashboard():
 
     st.sidebar.markdown("### 🔑 API Keys por cliente")
     client["apis"]["openai"] = st.sidebar.text_input("OpenAI API Key", value=client["apis"].get("openai", ""), type="password")
-    st.sidebar.text_input("Gemini API Key (próximamente)", disabled=True)
-    st.sidebar.text_input("Claude API Key (próximamente)", disabled=True)
-
     save_users(users)
 
     api_key = client["apis"]["openai"]
@@ -147,26 +134,27 @@ def geo_tracker_dashboard():
 
     def call_openai(prompt):
         try:
-            openai.api_key = api_key
-            response = openai.ChatCompletion.create(
+            client_oai = openai.OpenAI(api_key=api_key)
+            response = client_oai.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7
             )
-            return response['choices'][0]['message']['content']
+            return response.choices[0].message.content
         except Exception as e:
             st.error(f"Error al consultar OpenAI: {e}")
             return None
 
     def generate_recommendation(prompt, brand, response):
-        analysis_prompt = f"""Este es un análisis SEO para IA. Prompt original: "{prompt}". Marca: "{brand}". Respuesta de la IA: "{response[:1000]}". ¿Qué debería mejorar esta marca para aparecer mejor posicionada en esta respuesta de IA? Da recomendaciones claras."""
+        analysis_prompt = f"Este es un análisis SEO para IA. Prompt original: '{prompt}'. Marca: '{brand}'. Respuesta de la IA: '{response[:1000]}'. ¿Qué debería mejorar esta marca para aparecer mejor posicionada en esta respuesta de IA? Da recomendaciones claras."
         try:
-            rec_response = openai.ChatCompletion.create(
+            client_oai = openai.OpenAI(api_key=api_key)
+            rec_response = client_oai.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": analysis_prompt}],
                 temperature=0.7
             )
-            return rec_response['choices'][0]['message']['content']
+            return rec_response.choices[0].message.content
         except Exception as e:
             st.warning("No se pudo generar la recomendación.")
             return "No disponible"
@@ -233,7 +221,7 @@ def geo_tracker_dashboard():
                 st.markdown("---")
                 st.markdown(f"**Recomendación:**\n\n{row['recommendation']}")
 
-# --- PUNTO DE ENTRADA ---
+# --- APP ENTRY POINT ---
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
