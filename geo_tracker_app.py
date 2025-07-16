@@ -1,13 +1,3 @@
-# Generar el código Python completo de más de 200 líneas incluyendo:
-# - Registro de usuarios
-# - Login
-# - Consulta a OpenAI
-# - Uso de spinner
-# - Visualización opcional
-# - Comentarios y estructura profesional
-
-# Comenzamos armando la estructura como string
-python_code = """
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -42,7 +32,7 @@ def verify_password(password, hashed):
 # --- Coincidencia de palabras clave (si se usa más adelante) ---
 def get_keyword_matches(text, keywords):
     text = text.lower()
-    return [kw for kw in keywords if re.search(rf'\\\\b{re.escape(kw.lower())}\\\\b', text)]
+    return [kw for kw in keywords if re.search(rf'\b{re.escape(kw.lower())}\b', text)]
 
 # --- Llamada a OpenAI con caché ---
 def call_openai_cached(prompt, api_key, model):
@@ -133,15 +123,14 @@ elif menu == "OpenAI":
             if not prompt.strip():
                 st.warning("El prompt está vacío.")
             else:
-                with st.spinner("Consultando a OpenAI..."):
-                    result = call_openai_cached(prompt, st.session_state.api_key, model)
-                    if result:
-                        st.success("Respuesta de OpenAI:")
-                        st.markdown(result)
-                    else:
-                        st.error("No se obtuvo respuesta.")
+                result = call_openai_cached(prompt, st.session_state.api_key, model)
+                if result:
+                    st.success("Respuesta de OpenAI:")
+                    st.markdown(result)
+                else:
+                    st.error("No se obtuvo respuesta.")
         
-        # Opcional: Historial
+        # Historial simple
         if "openai_cache" in st.session_state:
             st.subheader("📜 Historial (caché)")
             for key, val in list(st.session_state.openai_cache.items())[-5:][::-1]:
@@ -150,10 +139,3 @@ elif menu == "OpenAI":
 # --- Footer ---
 st.markdown("---")
 st.markdown("📦 Proyecto de ejemplo con Streamlit + OpenAI")
-"""
-
-with open("/mnt/data/app_openai_login.py", "w", encoding="utf-8") as f:
-    f.write(python_code)
-
-"/mnt/data/app_openai_login.py"
-
