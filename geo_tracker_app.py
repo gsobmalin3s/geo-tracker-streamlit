@@ -1,3 +1,4 @@
+
 # Este archivo usa el cliente OpenAI >= 1.0.0 con client.chat.completions.create()
 
 import streamlit as st
@@ -41,9 +42,6 @@ def get_keyword_matches(text, keywords):
     return [kw for kw in keywords if re.search(rf'\b{re.escape(kw.lower())}\b', text)]
 
 def generar_pdf_informe(df, brand):
-    from fpdf import FPDF
-    from io import BytesIO
-
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
@@ -51,21 +49,20 @@ def generar_pdf_informe(df, brand):
     pdf.cell(200, 10, txt=f"Informe IA – {brand}", ln=True, align="C")
     pdf.ln(10)
 
-    for i, row in df.iterrows():
-        prompt = row.get("prompt", "—")
-        mention = 'Sí' if row.get("mention") else 'No'
-        link = 'Sí' if row.get("link") else 'No'
-        matched = ', '.join(row.get("matched_keywords", [])) or '—'
-        position = row.get("position") or '—'
-        recommendation = row.get("recommendation", "No disponible")
-
+    for _, row in df.iterrows():
         content = (
-            f"Prompt: {prompt}\n"
-            f"Mención: {mention}\n"
-            f"Enlace: {link}\n"
-            f"Palabras clave: {matched}\n"
-            f"Posición: {position}\n"
-            f"Recomendación: {recommendation}\n"
+            f"Prompt: {row.get('prompt', '—')}
+"
+            f"Mención: {'Sí' if row.get('mention') else 'No'}
+"
+            f"Enlace: {'Sí' if row.get('link') else 'No'}
+"
+            f"Palabras clave: {', '.join(row.get('matched_keywords', [])) or '—'}
+"
+            f"Posición: {row.get('position') or '—'}
+"
+            f"Recomendación: {row.get('recommendation', 'No disponible')}
+"
             f"{'-'*50}"
         )
         pdf.multi_cell(0, 6, content)
@@ -73,16 +70,15 @@ def generar_pdf_informe(df, brand):
     pdf_bytes = pdf.output(dest='S').encode('latin1')
     return BytesIO(pdf_bytes)
 
-
-# --- AUTENTICACIÓN ---
+# --- DASHBOARD ---
 def login_screen():
     st.title("🔐 GEO Tracker PRO")
     tab_login, tab_register = st.tabs(["Iniciar sesión", "Registrarse"])
     users = load_users()
 
     with tab_login:
-        username = st.text_input("Usuario", help="Tu nombre de usuario para iniciar sesión.")
-        password = st.text_input("Contraseña", type="password", help="Introduce tu contraseña segura.")
+        username = st.text_input("Usuario")
+        password = st.text_input("Contraseña", type="password")
         if st.button("Iniciar sesión"):
             if username in users and verify_password(password, users[username]["password"]):
                 st.session_state.authenticated = True
@@ -93,36 +89,26 @@ def login_screen():
                 st.error("Usuario o contraseña incorrectos.")
 
     with tab_register:
-        new_user = st.text_input("Nuevo usuario", help="Introduce tu correo o nombre de usuario para registrarte.")
-        new_pass = st.text_input("Nueva contraseña", type="password", help="Crea una contraseña segura.")
+        new_user = st.text_input("Nuevo usuario")
+        new_pass = st.text_input("Nueva contraseña", type="password")
         if st.button("Crear cuenta"):
             if new_user in users:
                 st.warning("Ese usuario ya existe.")
             elif not new_user or not new_pass:
                 st.warning("Rellena ambos campos.")
             else:
-                users[new_user] = {
-                    "password": hash_password(new_pass),
-                    "clients": {}
-                }
+                users[new_user] = {"password": hash_password(new_pass), "clients": {}}
                 save_users(users)
                 st.success("Usuario creado. Ahora puedes iniciar sesión.")
 
-# --- DASHBOARD PRINCIPAL ---
 def geo_tracker_dashboard():
     users = load_users()
     user = st.session_state.username
-
     if user not in users:
-        st.error("Este usuario ya no existe. Por favor, cierra sesión y vuelve a entrar.")
-        if st.button("Cerrar sesión"):
-            st.session_state.authenticated = False
-            st.session_state.username = None
-            st.rerun()
-        st.stop()
+        st.error("Usuario no encontrado.")
+        return
 
     clients = users[user]["clients"]
-
     st.sidebar.markdown(f"👤 Usuario: {user}")
     selected_client = st.sidebar.selectbox("Selecciona cliente", list(clients.keys()) + ["➕ Crear nuevo"])
 
@@ -141,64 +127,36 @@ def geo_tracker_dashboard():
             st.rerun()
 
     if selected_client not in clients:
-        st.stop()
+        return
 
     client = clients[selected_client]
-    st.sidebar.markdown("### ⚙️ Configuración")
-    client["brand"] = st.sidebar.text_input("Marca", value=client.get("brand", ""), help="Nombre de la marca que se quiere analizar.")
-    client["domain"] = st.sidebar.text_input("Dominio", value=client.get("domain", ""), help="Dominio web principal del cliente.")
-
-    if client.get("domain"):
-        domain_clean = client["domain"].replace("https://", "").replace("http://", "").split("/")[0]
-        favicon_url = f"https://www.google.com/s2/favicons?sz=64&domain={domain_clean}"
-        st.sidebar.image(favicon_url, width=32)
-
-    st.sidebar.markdown("### 🔑 API Keys por cliente")
-    client["apis"]["openai"] = st.sidebar.text_input("OpenAI API Key", value=client["apis"].get("openai", ""), type="password", help="Clave privada para acceder a la API de OpenAI.")
-    st.sidebar.text_input("Gemini API (próximamente)", disabled=True)
-    st.sidebar.text_input("Perplexity API (próximamente)", disabled=True)
-    api_key = client["apis"]["openai"]
-    model = st.sidebar.selectbox("Modelo GPT", ["gpt-4", "gpt-3.5-turbo"], help="Modelo de lenguaje a utilizar para las consultas.")
+    st.sidebar.text_input("Dominio", value=client.get("domain", ""), key="dominio", help="Dominio web del cliente")
+    client["brand"] = st.sidebar.text_input("Marca", value=client.get("brand", ""))
+    client["apis"]["openai"] = st.sidebar.text_input("OpenAI API Key", value=client["apis"].get("openai", ""), type="password")
+    model = st.sidebar.selectbox("Modelo GPT", ["gpt-4", "gpt-3.5-turbo"])
     run = st.sidebar.button("🚀 Consultar IA")
     save_users(users)
 
-    st.markdown("### 🔑 Palabras clave principales")
-    keywords_str = st.text_area("Palabras clave (una por línea):", "\n".join(client.get("keywords", [])), help="Introduce las palabras clave que deseas rastrear.")
+    keywords_str = st.text_area("Palabras clave", "
+".join(client.get("keywords", [])))
     client["keywords"] = [kw.strip() for kw in keywords_str.splitlines() if kw.strip()]
     save_users(users)
 
-    st.markdown("### 📥 Importar palabras clave desde Search Console")
-    uploaded_file = st.file_uploader("Sube un CSV exportado desde GSC", type=["csv"], help="Debe contener una columna llamada 'Consulta'.")
-    if uploaded_file is not None:
-        try:
-            df_keywords = pd.read_csv(uploaded_file)
-            if "Consulta" in df_keywords.columns:
-                new_keywords = df_keywords["Consulta"].dropna().unique().tolist()
-                client["keywords"].extend([kw for kw in new_keywords if kw not in client["keywords"]])
-                client["keywords"] = sorted(set(client["keywords"]))
-                st.success(f"{len(new_keywords)} palabras clave añadidas.")
-                save_users(users)
-            else:
-                st.error("El archivo no tiene una columna 'Consulta'.")
-        except Exception as e:
-            st.error(f"Error al leer el archivo: {e}")
-
-    st.markdown("### ✍️ Prompts personalizados")
     if st.button("➕ Añadir nuevo prompt"):
         client["prompts"].append("")
         save_users(users)
 
     cols = st.columns(2)
-    for i in range(len(client["prompts"])):
+    for i, prompt in enumerate(client["prompts"]):
         with cols[i % 2]:
-            value = st.text_area(f"Prompt #{i+1}", client["prompts"][i], height=80, key=f"prompt_{i}", help="Consulta que se le hará al modelo de IA.")
-            client["prompts"][i] = value
+            val = st.text_area(f"Prompt #{i+1}", prompt, key=f"prompt_{i}")
+            client["prompts"][i] = val
     save_users(users)
 
     def call_openai(prompt):
         try:
-            client = OpenAI(api_key=api_key)
-            response = client.chat.completions.create(
+            client_ai = OpenAI(api_key=client["apis"]["openai"])
+            response = client_ai.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7
@@ -208,102 +166,60 @@ def geo_tracker_dashboard():
             st.error(f"Error al consultar OpenAI: {e}")
             return None
 
-    def generate_recommendation(prompt, brand, response):
-        analysis_prompt = (
-            f"Este es un análisis SEO para IA. Prompt original: '{prompt}'. "
-            f"Marca: '{brand}'. Respuesta de la IA: '{response[:1000]}'. "
-            f"¿Qué debería mejorar esta marca para aparecer mejor posicionada en esta respuesta de IA? "
-            f"Da recomendaciones claras."
-        )
-        try:
-            client = OpenAI(api_key=api_key)
-            rec_response = client.chat.completions.create(
-                model=model,
-                messages=[{"role": "user", "content": analysis_prompt}],
-                temperature=0.7
-            )
-            return rec_response.choices[0].message.content
-        except Exception as e:
-            st.warning("No se pudo generar la recomendación.")
-            return "No disponible"
+    def generate_inline_recommendation(prompt, brand, response):
+        if brand.lower() not in response.lower():
+            return "La marca no fue mencionada. Mejorar autoridad o relevancia."
+        if "http" not in response:
+            return "Considera incluir enlaces relevantes o mejorar presencia digital."
+        return "Presencia adecuada. Reforzar con más contenido relevante."
 
     if run:
-        valid_prompts = [p for p in client["prompts"] if p.strip()]
-        if not api_key:
-            st.warning("⚠️ Debes introducir una API Key válida de OpenAI.")
-        elif not client["brand"]:
-            st.warning("⚠️ Debes introducir una marca.")
-        elif not valid_prompts:
-            st.warning("⚠️ No hay prompts válidos para procesar.")
-        else:
-            client["results"] = []
-            for p in valid_prompts:
-                response = call_openai(p)
-                if not response:
-                    continue
-                response_lower = response.lower()
-                keyword_matches = get_keyword_matches(response_lower, client.get("keywords", []))
-                mention = len(keyword_matches) > 0
-                link = "http" in response_lower
-                position = None
-                for i, line in enumerate(response.splitlines()):
-                    if any(kw in line.lower() for kw in keyword_matches) and line.strip().split(" ")[0].isdigit():
-                        position = i + 1
-                        break
-                recommendation = generate_recommendation(p, client["brand"], response)
-                client["results"].append({
-                    "prompt": p,
-                    "mention": mention,
-                    "matched_keywords": keyword_matches,
-                    "link": link,
-                    "position": position,
-                    "timestamp": datetime.datetime.now().isoformat(),
-                    "response": response,
-                    "recommendation": recommendation
-                })
-            save_users(users)
+        results = []
+        for p in [p for p in client["prompts"] if p.strip()]:
+            resp = call_openai(p)
+            if not resp:
+                continue
+            matched = get_keyword_matches(resp, client["keywords"])
+            results.append({
+                "prompt": p,
+                "mention": bool(matched),
+                "matched_keywords": matched,
+                "link": "http" in resp,
+                "position": None,
+                "timestamp": datetime.datetime.now().isoformat(),
+                "response": resp,
+                "recommendation": generate_inline_recommendation(p, client["brand"], resp)
+            })
+        client["results"] = results
+        save_users(users)
 
     if client.get("results"):
         df = pd.DataFrame(client["results"])
         mostrar_dashboard_final(df, client, selected_client)
 
 def mostrar_dashboard_final(df, client, selected_client):
-    st.markdown("## 📊 Resultados del análisis")
+    st.markdown("## 📊 Resultados")
+    df["matched_keywords"] = df["matched_keywords"].apply(lambda x: ", ".join(x))
+    st.dataframe(df[["prompt", "mention", "link", "matched_keywords", "recommendation"]])
 
-    df_show = df.copy()
-    df_show["matched_keywords"] = df_show["matched_keywords"].apply(lambda x: ", ".join(x))
-    st.dataframe(df_show[["prompt", "mention", "link", "matched_keywords", "position", "recommendation"]], use_container_width=True)
-
-    st.markdown("### 📄 Descargar informe en PDF")
+    st.markdown("### 📄 Descargar PDF")
     if st.button("📥 Generar PDF"):
         pdf = generar_pdf_informe(df, client["brand"])
-        st.download_button("Descargar Informe", data=pdf, file_name=f"informe_{client['brand']}.pdf", mime="application/pdf")
+        st.download_button("Descargar", data=pdf, file_name=f"{client['brand']}_informe.pdf")
 
-    st.markdown("### 🌍 Índice de visibilidad GEO (por prompt)")
+    st.markdown("### 🌍 Índice de visibilidad GEO")
 
     def calcular_indice(row):
         score = 0
-        if row["mention"]:
-            score += 1
-        if row["link"]:
-            score += 1
-        if row["position"] and isinstance(row["position"], int):
-            score += max(0, 5 - row["position"]) * 0.5
-        score += len(row["matched_keywords"]) * 0.3
+        if row.get("mention"): score += 1
+        if row.get("link"): score += 1
+        if isinstance(row.get("position"), int): score += max(0, 5 - row["position"]) * 0.5
+        score += len(row.get("matched_keywords", "").split(", ")) * 0.3
         return round(score, 2)
 
     df["visibilidad_geo"] = df.apply(calcular_indice, axis=1)
-
-    fig = px.bar(
-        df,
-        x="prompt",
-        y="visibilidad_geo",
-        color="visibilidad_geo",
-        labels={"visibilidad_geo": "Índice de Visibilidad"},
-        title="Visibilidad GEO por Prompt",
-        text="visibilidad_geo"
-    )
-    fig.update_layout(xaxis_title="Prompt", yaxis_title="Índice", height=500)
+    fig = px.bar(df, x="prompt", y="visibilidad_geo", text="visibilidad_geo", color="visibilidad_geo",
+                 labels={"visibilidad_geo": "Índice GEO"}, title="Índice de Visibilidad por Prompt")
     st.plotly_chart(fig, use_container_width=True)
 
 # --- INICIO ---
