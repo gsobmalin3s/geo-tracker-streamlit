@@ -61,7 +61,7 @@ prompts = []
 cols = st.columns(5)
 for i in range(25):
     with cols[i % 5]:
-        p = st.text_area(f"Prompt #{i+1}", default_prompts[i], height=50, key=f"prompt_{i}")
+        p = st.text_area(f"Prompt #{i+1}", default_prompts[i], height=80, key=f"prompt_{i}")
         if p.strip():
             prompts.append(p.strip())
 
