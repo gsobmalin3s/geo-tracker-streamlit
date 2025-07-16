@@ -263,3 +263,4 @@ def geo_tracker_dashboard():
                 st.markdown(f"**Recomendación:**
 
 {row['recommendation']}")
+
