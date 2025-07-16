@@ -1,4 +1,3 @@
-# geo_tracker_pro.py
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -10,14 +9,15 @@ import openai
 import re
 from fpdf import FPDF
 from io import BytesIO
-from tempfile import NamedTemporaryFile
 
-# --- CONFIG ---
+# --- CONFIG GLOBAL ---
 st.set_page_config(page_title="GEO Tracker PRO", layout="wide")
+
+# --- RUTAS ---
 USER_DB = "data/users.json"
 os.makedirs("data", exist_ok=True)
 
-# --- UTILS ---
+# --- UTILIDADES ---
 def load_users():
     if os.path.exists(USER_DB):
         with open(USER_DB, "r", encoding="utf-8") as f:
@@ -38,20 +38,13 @@ def get_keyword_matches(text, keywords):
     text = text.lower()
     return [kw for kw in keywords if re.search(rf'\b{re.escape(kw.lower())}\b', text)]
 
-def generar_pdf_informe(df, brand, fig=None):
+def generar_pdf_informe(df, brand):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
     pdf.set_title(f"Informe de Visibilidad – {brand}")
     pdf.cell(200, 10, txt=f"Informe IA – {brand}", ln=True, align="C")
     pdf.ln(10)
-
-    if fig:
-        with NamedTemporaryFile(suffix=".png", delete=False) as tmpfile:
-            fig.write_image(tmpfile.name)
-            pdf.image(tmpfile.name, x=10, y=30, w=180)
-            pdf.ln(90)
-
     for i, row in df.iterrows():
         pdf.multi_cell(0, 6, f"Prompt: {row['prompt']}\n"
                              f"Mención: {'Sí' if row['mention'] else 'No'}\n"
@@ -96,19 +89,21 @@ def login_screen():
                 save_users(users)
                 st.success("Usuario creado. Ahora puedes iniciar sesión.")
 
-# --- DASHBOARD ---
+# --- DASHBOARD PRINCIPAL ---
 def geo_tracker_dashboard():
     users = load_users()
     user = st.session_state.username
 
     if user not in users:
-        st.error("Este usuario ya no existe.")
+        st.error("Este usuario ya no existe. Por favor, cierra sesión.")
         if st.button("Cerrar sesión"):
             st.session_state.authenticated = False
+            st.session_state.username = None
             st.rerun()
         st.stop()
 
     clients = users[user]["clients"]
+
     st.sidebar.markdown(f"👤 Usuario: {user}")
     selected_client = st.sidebar.selectbox("Selecciona cliente", list(clients.keys()) + ["➕ Crear nuevo"])
 
@@ -131,23 +126,42 @@ def geo_tracker_dashboard():
 
     client = clients[selected_client]
     st.sidebar.markdown("### ⚙️ Configuración")
-    client["brand"] = st.sidebar.text_input("Marca", value=client.get("brand", ""), help="Nombre de la marca a analizar. Aparecerá en los prompts y en el informe.").strip()
-    client["domain"] = st.sidebar.text_input("Dominio", value=client.get("domain", ""), help="Web principal del cliente. Se usa para mostrar favicon e identificar enlaces.").lower().strip()
+    client["brand"] = st.sidebar.text_input("Marca", value=client.get("brand", ""))
+    client["domain"] = st.sidebar.text_input("Dominio", value=client.get("domain", ""))
     if client.get("domain"):
-        favicon_url = f"https://www.google.com/s2/favicons?sz=64&domain={client['domain']}"
+        domain_clean = client["domain"].replace("https://", "").replace("http://", "").split("/")[0]
+        favicon_url = f"https://www.google.com/s2/favicons?sz=64&domain={domain_clean}"
         st.sidebar.image(favicon_url, width=32)
 
-    st.sidebar.markdown("### 🔑 API Keys")
-    client["apis"]["openai"] = st.sidebar.text_input("OpenAI API Key", value=client["apis"].get("openai", ""), type="password", help="Clave secreta desde https://platform.openai.com")
+    st.sidebar.markdown("### 🔑 API Keys por cliente")
+    client["apis"]["openai"] = st.sidebar.text_input("OpenAI API Key", value=client["apis"].get("openai", ""), type="password")
+    st.sidebar.text_input("Gemini API (próximamente)", disabled=True)
+    st.sidebar.text_input("Perplexity API (próximamente)", disabled=True)
     api_key = client["apis"]["openai"]
     model = st.sidebar.selectbox("Modelo GPT", ["gpt-4", "gpt-3.5-turbo"])
     run = st.sidebar.button("🚀 Consultar IA")
     save_users(users)
 
     st.markdown("### 🔑 Palabras clave principales")
-    keywords_str = st.text_area("Palabras clave (una por línea):", "\n".join(client.get("keywords", [])), help="Introduce términos clave que quieres rastrear.")
-    client["keywords"] = [kw.strip().lower() for kw in keywords_str.splitlines() if kw.strip()]
+    keywords_str = st.text_area("Palabras clave (una por línea):", "\n".join(client.get("keywords", [])))
+    client["keywords"] = [kw.strip() for kw in keywords_str.splitlines() if kw.strip()]
     save_users(users)
+
+    st.markdown("### 📥 Importar palabras clave desde Search Console")
+    uploaded_file = st.file_uploader("Sube un CSV exportado desde GSC", type=["csv"])
+    if uploaded_file is not None:
+        try:
+            df_keywords = pd.read_csv(uploaded_file)
+            if "Consulta" in df_keywords.columns:
+                new_keywords = df_keywords["Consulta"].dropna().unique().tolist()
+                client["keywords"].extend([kw for kw in new_keywords if kw not in client["keywords"]])
+                client["keywords"] = sorted(set(client["keywords"]))
+                st.success(f"{len(new_keywords)} palabras clave añadidas.")
+                save_users(users)
+            else:
+                st.error("El archivo no tiene una columna 'Consulta'.")
+        except Exception as e:
+            st.error(f"Error al leer el archivo: {e}")
 
     st.markdown("### ✍️ Prompts personalizados")
     if st.button("➕ Añadir nuevo prompt"):
@@ -157,8 +171,8 @@ def geo_tracker_dashboard():
     cols = st.columns(2)
     for i in range(len(client["prompts"])):
         with cols[i % 2]:
-            value = st.text_area(f"Prompt #{i+1}", client["prompts"][i], height=80, key=f"prompt_{i}", help="Consulta para la IA. Usa marca y palabras clave.")
-            client["prompts"][i] = value.strip()
+            value = st.text_area(f"Prompt #{i+1}", client["prompts"][i], height=80, key=f"prompt_{i}")
+            client["prompts"][i] = value
     save_users(users)
 
     def call_openai(prompt):
@@ -176,9 +190,10 @@ def geo_tracker_dashboard():
 
     def generate_recommendation(prompt, brand, response):
         analysis_prompt = (
-            f"Este es un análisis SEO para IA. Prompt: '{prompt.lower()}'. "
-            f"Marca: '{brand.lower()}'. Respuesta IA: '{response[:1000].lower()}'. "
-            f"¿Qué puede mejorar esta marca para mejorar su visibilidad?"
+            f"Este es un análisis SEO para IA. Prompt original: '{prompt}'. "
+            f"Marca: '{brand}'. Respuesta de la IA: '{response[:1000]}'. "
+            f"¿Qué debería mejorar esta marca para aparecer mejor posicionada en esta respuesta de IA? "
+            f"Da recomendaciones claras."
         )
         try:
             openai_client = openai.OpenAI(api_key=api_key)
@@ -188,17 +203,18 @@ def geo_tracker_dashboard():
                 temperature=0.7
             )
             return rec_response.choices[0].message.content
-        except Exception:
+        except Exception as e:
+            st.warning("No se pudo generar la recomendación.")
             return "No disponible"
 
     if run:
         valid_prompts = [p for p in client["prompts"] if p.strip()]
         if not api_key:
-            st.warning("⚠️ Debes introducir una API Key válida.")
+            st.warning("⚠️ Debes introducir una API Key válida de OpenAI.")
         elif not client["brand"]:
             st.warning("⚠️ Debes introducir una marca.")
         elif not valid_prompts:
-            st.warning("⚠️ No hay prompts válidos.")
+            st.warning("⚠️ No hay prompts válidos para procesar.")
         else:
             client["results"] = []
             for p in valid_prompts:
@@ -229,5 +245,29 @@ def geo_tracker_dashboard():
 
     if client.get("results"):
         df = pd.DataFrame(client["results"])
+
+        # --- Gráfico Índice Visibilidad GEO ---
         df['score'] = df.apply(lambda row: (1 if row['mention'] else 0) + (1 if row['link'] else 0), axis=1)
-        df['sco]()
+        df['score'] += df['position'].apply(lambda x: max(0, 3 - int(x)) if pd.notnull(x) else 0)
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        df_sorted = df.sort_values("timestamp")
+        visibilidad_geo = df_sorted.groupby(df_sorted["timestamp"].dt.date)["score"].sum().reset_index()
+        visibilidad_geo.columns = ["Fecha", "Índice de Visibilidad GEO"]
+
+        fig = px.line(visibilidad_geo, x="Fecha", y="Índice de Visibilidad GEO", markers=True,
+                      title="📈 Índice de Visibilidad GEO (evolución diaria)")
+
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Mostrar tabla
+        st.markdown("### 📊 Resultados")
+        st.dataframe(df)
+
+# --- INICIO ---
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+if st.session_state.authenticated:
+    geo_tracker_dashboard()
+else:
+    login_screen()
