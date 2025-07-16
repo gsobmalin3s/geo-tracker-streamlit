@@ -3,6 +3,7 @@ import openai
 import pandas as pd
 import datetime
 import plotly.express as px
+import os
 
 st.set_page_config(page_title="GEO Tracker PRO", layout="wide")
 
@@ -30,7 +31,12 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- GESTIÓN DE CLIENTES ---
-st.sidebar.image("assets/logo-lin3s.jpg", width=160)
+logo_path = "assets/logo-lin3s.jpg"
+if os.path.exists(logo_path):
+    st.sidebar.image(logo_path, width=160)
+else:
+    st.sidebar.markdown("### GEO Tracker PRO")
+
 st.sidebar.markdown("### 👥 Cliente")
 
 if "clients" not in st.session_state:
@@ -43,7 +49,8 @@ client_options = list(st.session_state.clients.keys())
 selected_client = st.sidebar.selectbox(
     "Selecciona cliente",
     client_options + ["➕ Crear nuevo"],
-    index=client_options.index(st.session_state.selected_client) if st.session_state.selected_client in client_options else len(client_options)
+    index=client_options.index(st.session_state.selected_client)
+    if st.session_state.selected_client in client_options else len(client_options)
 )
 
 if selected_client == "➕ Crear nuevo":
