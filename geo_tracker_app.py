@@ -247,8 +247,4 @@ else:
     login_screen()
 """
 
-# Guardar archivo limpio y listo
-with open("/mnt/data/geo_tracker_app_clean.py", "w", encoding="utf-8") as f:
-    f.write(fixed_code)
 
-"/mnt/data/geo_tracker_app_clean.py"
