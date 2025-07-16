@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import openai
+import re
 
 # --- RUTAS ---
 USER_DB = "data/users.json"
@@ -116,9 +117,20 @@ def geo_tracker_dashboard():
     model = st.sidebar.selectbox("Modelo GPT", ["gpt-4", "gpt-3.5-turbo"])
     run = st.sidebar.button("🚀 Consultar IA")
 
-    aliases = [client["brand"], client["brand"].lower()]
-    if client["brand"].lower() == "uoc":
-        aliases.append("universitat oberta de catalunya")
+    # Aliases expandidos
+    aliases = set()
+    brand = client["brand"].strip().lower()
+    domain = client["domain"].strip().lower().replace("https://", "").replace("http://", "").split("/")[0]
+    aliases.add(brand)
+    if domain:
+        aliases.add(domain)
+    if "uoc" in brand or "universitat oberta" in brand:
+        aliases.update([
+            "uoc", "www.uoc.edu", "universitat oberta",
+            "universitat oberta de catalunya",
+            "universitat oberta de cataluña",
+            "uoc.edu"
+        ])
 
     st.markdown("### ✍️ Prompts personalizados")
     if st.button("➕ Añadir nuevo prompt"):
@@ -173,11 +185,12 @@ def geo_tracker_dashboard():
                 response = call_openai(p)
                 if not response:
                     continue
-                mention = any(alias.lower() in response.lower() for alias in aliases)
-                link = "http" in response
+                response_lower = response.lower()
+                mention = any(re.search(rf'\b{re.escape(alias)}\b', response_lower) for alias in aliases)
+                link = "http" in response_lower
                 position = None
                 for i, line in enumerate(response.splitlines()):
-                    if any(alias.lower() in line.lower() for alias in aliases) and line.strip().split(" ")[0].isdigit():
+                    if any(re.search(rf'\b{re.escape(alias)}\b', line.lower()) for alias in aliases) and line.strip().split(" ")[0].isdigit():
                         position = i + 1
                         break
                 recommendation = generate_recommendation(p, client["brand"], response)
