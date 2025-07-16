@@ -4,7 +4,23 @@ import pandas as pd
 import datetime
 import plotly.express as px
 import os
+import json
 
+# --- ARCHIVO DE CLIENTES ---
+DATA_PATH = "data/clients.json"
+os.makedirs("data", exist_ok=True)
+
+def load_clients():
+    if os.path.exists(DATA_PATH):
+        with open(DATA_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+def save_clients(clients):
+    with open(DATA_PATH, "w", encoding="utf-8") as f:
+        json.dump(clients, f, indent=2, ensure_ascii=False)
+
+# --- CONFIG STREAMLIT ---
 st.set_page_config(page_title="GEO Tracker PRO", layout="wide")
 
 # --- ESTILOS ---
@@ -30,20 +46,22 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- GESTIÓN DE CLIENTES ---
+# --- CARGA DE CLIENTES ---
+if "clients" not in st.session_state:
+    st.session_state.clients = load_clients()
+
+if "selected_client" not in st.session_state:
+    st.session_state.selected_client = None
+
+# --- LOGO ---
 logo_path = "assets/logo-lin3s.jpg"
 if os.path.exists(logo_path):
     st.sidebar.image(logo_path, width=160)
 else:
     st.sidebar.markdown("### GEO Tracker PRO")
 
+# --- CLIENTES ---
 st.sidebar.markdown("### 👥 Cliente")
-
-if "clients" not in st.session_state:
-    st.session_state.clients = {}
-
-if "selected_client" not in st.session_state:
-    st.session_state.selected_client = None
 
 client_options = list(st.session_state.clients.keys())
 selected_client = st.sidebar.selectbox(
@@ -67,6 +85,7 @@ if selected_client == "➕ Crear nuevo":
                 "claude": None
             }
         }
+        save_clients(st.session_state.clients)
         st.session_state.selected_client = new_name
         st.experimental_rerun()
 else:
@@ -77,22 +96,24 @@ if selected_client not in st.session_state.clients:
 
 client = st.session_state.clients[selected_client]
 
-# --- CONFIGURACIÓN ---
+# --- CONFIGURACIÓN DEL CLIENTE ---
 st.sidebar.markdown("### ⚙️ Configuración")
 client["brand"] = st.sidebar.text_input("Marca", value=client.get("brand", ""))
 client["domain"] = st.sidebar.text_input("Dominio", value=client.get("domain", ""))
 
-# --- Imagen de perfil desde favicon ---
+# Imagen del favicon del dominio
 if client.get("domain"):
     domain_clean = client["domain"].replace("https://", "").replace("http://", "").split("/")[0]
     favicon_url = f"https://www.google.com/s2/favicons?sz=64&domain={domain_clean}"
     st.sidebar.image(favicon_url, width=32)
 
-# --- API por cliente ---
+# API keys exclusivas por cliente
 st.sidebar.markdown("### 🔑 API Keys por cliente")
 client["apis"]["openai"] = st.sidebar.text_input("OpenAI API Key", value=client["apis"].get("openai", ""), type="password")
 st.sidebar.text_input("Gemini API Key (próximamente)", disabled=True)
 st.sidebar.text_input("Claude API Key (próximamente)", disabled=True)
+
+save_clients(st.session_state.clients)  # Guardar tras cualquier cambio
 
 api_key = client["apis"]["openai"]
 model = st.sidebar.selectbox("Modelo GPT", ["gpt-4", "gpt-3.5-turbo"])
@@ -102,17 +123,19 @@ aliases = [client["brand"], client["brand"].lower()]
 if client["brand"].lower() == "uoc":
     aliases.append("universitat oberta de catalunya")
 
-# --- PROMPTS PERSONALIZADOS ---
+# --- PROMPTS ---
 st.markdown("### ✍️ Prompts personalizados")
 
 if st.button("➕ Añadir nuevo prompt"):
     client["prompts"].append("")
+    save_clients(st.session_state.clients)
 
 cols = st.columns(2)
 for i in range(len(client["prompts"])):
     with cols[i % 2]:
         value = st.text_area(f"Prompt #{i+1}", client["prompts"][i], height=80, key=f"prompt_{i}")
         client["prompts"][i] = value
+save_clients(st.session_state.clients)
 
 # --- FUNCIONES GPT ---
 def call_openai(prompt):
@@ -169,10 +192,11 @@ if run:
                 "mention": mention,
                 "link": link,
                 "position": position,
-                "timestamp": datetime.datetime.now(),
+                "timestamp": datetime.datetime.now().isoformat(),
                 "response": response,
                 "recommendation": recommendation
             })
+        save_clients(st.session_state.clients)
 
 # --- DASHBOARD ---
 if client["results"]:
