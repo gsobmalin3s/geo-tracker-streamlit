@@ -67,9 +67,12 @@ client = st.session_state.clients[selected_client]
 # --- PERFIL DEL CLIENTE ---
 st.markdown(f"## {client['brand']}")
 st.image(client["favicon"], width=32)
-st.markdown(f"**Dominio:** {client['domain']}  
+st.markdown(
+    f"""**Dominio:** {client['domain']}  
 **Sector:** {client['sector']}  
-{client['description']}")
+**Descripción:** {client['description']}"""
+)
+
 
 # --- CONFIGURACIÓN ---
 st.sidebar.markdown("### ⚙️ Configuración")
