@@ -1,3 +1,5 @@
+# Debido al tamaño del script, escribimos el archivo en una segunda celda
+code = """
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -5,14 +7,12 @@ import datetime
 import hashlib
 import json
 import os
-import openai
 import re
-
+from fpdf import FPDF
+from io import BytesIO
 
 # --- CONFIG GLOBAL ---
 st.set_page_config(page_title="GEO Tracker PRO", layout="wide")
-
-# --- RUTAS ---
 USER_DB = "data/users.json"
 os.makedirs("data", exist_ok=True)
 
@@ -35,7 +35,60 @@ def verify_password(password, hashed):
 
 def get_keyword_matches(text, keywords):
     text = text.lower()
-    return [kw for kw in keywords if re.search(rf'\b{re.escape(kw.lower())}\b', text)]
+    return [kw for kw in keywords if re.search(rf'\\\\b{re.escape(kw.lower())}\\\\b', text)]
+
+def simulate_ai_response(prompt, model_name):
+    examples = {
+        "ChatGPT": f"Claro, aquí tienes una lista de los mejores servicios para {prompt}: 1. MarcaX 2. OtroServicio 3. Recomendado.net",
+        "Gemini": f"Según nuestra base de datos, {prompt} se puede resolver con plataformas como MarcaX y otras opciones del mercado.",
+        "Claude": f"Para {prompt}, se recomienda explorar alternativas como MarcaX. Estas ofrecen buena cobertura y experiencia."
+    }
+    return examples.get(model_name, f"Respuesta genérica para: {prompt}")
+
+def simulate_recommendation(response, brand):
+    if brand.lower() not in response.lower():
+        return "❌ No apareces. Refuerza autoridad de marca y enlaces relevantes."
+    elif "http" not in response:
+        return "✅ Apareces sin enlace. Añade contenido con URLs claras en tu web."
+    else:
+        return "✅ Apareces con enlace. Continúa mejorando contenido útil e informacional."
+
+def sugerir_prompts(ya_existentes, sector="educación"):
+    base = {
+        "educación": ["mejores universidades en línea", "cursos online gratuitos", "educación IA personalizada"],
+        "salud": ["apps salud mental", "seguros de salud digitales", "terapias IA en salud"],
+        "legal": ["abogados digitales", "consultas legales gratis", "servicios legales IA"],
+        "ecommerce": ["mejores tiendas de electrónica", "alternativas Amazon", "comprar sin registro"]
+    }
+    todos = base.get(sector.lower(), [])
+    return [p for p in todos if p not in ya_existentes][:5]
+
+def generar_pdf_informe(df, brand, conclusion):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.set_title(f"Informe IA – {brand}")
+    pdf.set_font("Arial", style='B', size=14)
+    pdf.cell(200, 10, txt=f"Informe de Visibilidad – {brand}", ln=True, align="C")
+    pdf.set_font("Arial", size=10)
+    pdf.ln(10)
+    for i, row in df.iterrows():
+        pdf.multi_cell(0, 6, f"Prompt: {row['prompt']}\\n"
+                             f"Mención: {'Sí' if row['mention'] else 'No'}\\n"
+                             f"Enlace: {'Sí' if row['link'] else 'No'}\\n"
+                             f"Palabras clave: {', '.join(row['matched_keywords'])}\\n"
+                             f"Posición: {row['position'] or '—'}\\n"
+                             f"Recomendación: {row['recommendation']}\\n"
+                             f"{'-'*50}")
+    pdf.ln(8)
+    pdf.set_font("Arial", style='B', size=12)
+    pdf.cell(0, 10, "Conclusión general:", ln=True)
+    pdf.set_font("Arial", size=10)
+    pdf.multi_cell(0, 6, conclusion)
+    pdf_output = BytesIO()
+    pdf.output(pdf_output)
+    pdf_output.seek(0)
+    return pdf_output
 
 # --- AUTENTICACIÓN ---
 def login_screen():
@@ -44,7 +97,7 @@ def login_screen():
     users = load_users()
 
     with tab_login:
-        username = st.text_input("Usuario")
+        username = st.text_input("Email")
         password = st.text_input("Contraseña", type="password")
         if st.button("Iniciar sesión"):
             if username in users and verify_password(password, users[username]["password"]):
@@ -56,7 +109,7 @@ def login_screen():
                 st.error("Usuario o contraseña incorrectos.")
 
     with tab_register:
-        new_user = st.text_input("Nuevo usuario")
+        new_user = st.text_input("Email de registro")
         new_pass = st.text_input("Nueva contraseña", type="password")
         if st.button("Crear cuenta"):
             if new_user in users:
@@ -71,210 +124,128 @@ def login_screen():
                 save_users(users)
                 st.success("Usuario creado. Ahora puedes iniciar sesión.")
 
-# --- DASHBOARD ---
+# --- DASHBOARD SIMULADO ---
 def geo_tracker_dashboard():
     users = load_users()
     user = st.session_state.username
 
     if user not in users:
-        st.error("Este usuario ya no existe. Por favor, cierra sesión y vuelve a entrar.")
-        if st.button("Cerrar sesión"):
-            st.session_state.authenticated = False
-            st.session_state.username = None
-            st.rerun()
-        st.stop()
+        st.error("Este usuario ya no existe. Cierra sesión e inicia de nuevo.")
+        return
 
     clients = users[user]["clients"]
-
-    logo_path = "assets/logo-lin3s.jpg"
-    if os.path.exists(logo_path):
-        st.sidebar.image(logo_path, width=160)
-    else:
-        st.sidebar.markdown("### GEO Tracker PRO")
-
     st.sidebar.markdown(f"👤 Usuario: `{user}`")
-    st.sidebar.markdown("### 👥 Cliente")
-
-    client_options = list(clients.keys())
-    selected_client = st.sidebar.selectbox(
-        "Selecciona cliente",
-        client_options + ["➕ Crear nuevo"],
-        index=0 if client_options else len(client_options)
-    )
-
+    selected_client = st.sidebar.selectbox("Cliente", list(clients.keys()) + ["➕ Crear nuevo"])
     if selected_client == "➕ Crear nuevo":
-        new_name = st.sidebar.text_input("Nombre del nuevo cliente")
+        new_name = st.sidebar.text_input("Nuevo nombre de cliente")
         if st.sidebar.button("Crear cliente") and new_name:
             clients[new_name] = {
                 "brand": "",
                 "domain": "",
-                "prompts": ["" for _ in range(4)],
+                "prompts": [],
                 "results": [],
-                "apis": {"openai": ""},
-                "keywords": []
+                "keywords": [],
+                "apis": {"openai": "", "gemini": "", "perplexity": ""}
             }
             save_users(users)
             st.rerun()
 
     if selected_client not in clients:
-        st.stop()
+        return
 
     client = clients[selected_client]
-    st.sidebar.markdown("### ⚙️ Configuración")
-    client["brand"] = st.sidebar.text_input("Marca", value=client.get("brand", ""))
-    client["domain"] = st.sidebar.text_input("Dominio", value=client.get("domain", ""))
+    menu = st.radio("📂 Menú", ["Dashboard", "Palabras clave", "Importar CSV", "Prompts a trackear", "Índice de Visibilidad"])
+    model = "gpt-3.5-turbo"
 
-    if client.get("domain"):
-        domain_clean = client["domain"].replace("https://", "").replace("http://", "").split("/")[0]
-        favicon_url = f"https://www.google.com/s2/favicons?sz=64&domain={domain_clean}"
-        st.sidebar.image(favicon_url, width=32)
-
-    st.sidebar.markdown("### 🔑 API Keys por cliente")
-    client["apis"]["openai"] = st.sidebar.text_input(
-        "OpenAI API Key", value=client["apis"].get("openai", ""), type="password"
-    )
-    api_key = client["apis"]["openai"]
-    model = st.sidebar.selectbox("Modelo GPT", ["gpt-4", "gpt-3.5-turbo"])
-    run = st.sidebar.button("🚀 Consultar IA")
-    save_users(users)
-
-    st.markdown("### 🔑 Palabras clave principales")
-    keywords_str = st.text_area("Palabras clave (una por línea):", "\n".join(client.get("keywords", [])))
-    client["keywords"] = [kw.strip() for kw in keywords_str.splitlines() if kw.strip()]
-    save_users(users)
-
-    st.markdown("### 📥 Importar palabras clave desde Search Console")
-    uploaded_file = st.file_uploader("Sube un CSV exportado desde GSC", type=["csv"])
-    if uploaded_file is not None:
-        try:
-            df_keywords = pd.read_csv(uploaded_file)
-            if "Consulta" in df_keywords.columns:
-                new_keywords = df_keywords["Consulta"].dropna().unique().tolist()
-                client["keywords"].extend(
-                    [kw for kw in new_keywords if kw not in client["keywords"]]
-                )
-                client["keywords"] = sorted(set(client["keywords"]))
-                st.success(f"{len(new_keywords)} palabras clave añadidas.")
-                save_users(users)
-            else:
-                st.error("El archivo no tiene una columna 'Consulta'.")
-        except Exception as e:
-            st.error(f"Error al leer el archivo: {e}")
-
-    st.markdown("### ✍️ Prompts personalizados")
-    if st.button("➕ Añadir nuevo prompt"):
-        client["prompts"].append("")
-        save_users(users)
-
-    cols = st.columns(2)
-    for i in range(len(client["prompts"])):
-        with cols[i % 2]:
-            value = st.text_area(f"Prompt #{i+1}", client["prompts"][i], height=80, key=f"prompt_{i}")
-            client["prompts"][i] = value
-    save_users(users)
-
-    def call_openai(prompt):
-        try:
-            openai.api_key = api_key
-            response = openai.ChatCompletion.create(
-                model=model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.7
-            )
-            return response.choices[0].message.content
-        except Exception as e:
-            st.error(f"Error al consultar OpenAI: {e}")
-            return None
-
-    def generate_recommendation(prompt, brand, response):
-        analysis_prompt = (
-            f"Este es un análisis SEO para IA. Prompt original: '{prompt}'. "
-            f"Marca: '{brand}'. Respuesta de la IA: '{response[:1000]}'. "
-            f"¿Qué debería mejorar esta marca para aparecer mejor posicionada en esta respuesta de IA? "
-            f"Da recomendaciones claras."
-        )
-        try:
-            openai.api_key = api_key
-            rec_response = openai.ChatCompletion.create(
-                model=model,
-                messages=[{"role": "user", "content": analysis_prompt}],
-                temperature=0.7
-            )
-            return rec_response.choices[0].message.content
-        except Exception as e:
-            st.warning("No se pudo generar la recomendación.")
-            return "No disponible"
-
-    if run:
-        valid_prompts = [p for p in client["prompts"] if p.strip()]
-        if not api_key:
-            st.warning("⚠️ Debes introducir una API Key válida de OpenAI.")
-        elif not client["brand"]:
-            st.warning("⚠️ Debes introducir una marca.")
-        elif not valid_prompts:
-            st.warning("⚠️ No hay prompts válidos para procesar.")
-        else:
+    if menu == "Dashboard":
+        st.markdown("## 📊 Dashboard")
+        if st.button("🔁 Ejecutar simulación diaria"):
             client["results"] = []
-            for p in valid_prompts:
-                response = call_openai(p)
-                if not response:
-                    continue
-                response_lower = response.lower()
-                keyword_matches = get_keyword_matches(response_lower, client.get("keywords", []))
-                mention = len(keyword_matches) > 0
-                link = "http" in response_lower
+            for p in client["prompts"]:
+                response = simulate_ai_response(p, "ChatGPT")
+                matched = get_keyword_matches(response, client["keywords"])
+                mention = client["brand"].lower() in response.lower()
+                link = "http" in response
                 position = None
                 for i, line in enumerate(response.splitlines()):
-                    if any(kw in line.lower() for kw in keyword_matches) and line.strip().split(" ")[0].isdigit():
+                    if client["brand"].lower() in line.lower():
                         position = i + 1
                         break
-                recommendation = generate_recommendation(p, client["brand"], response)
+                recommendation = simulate_recommendation(response, client["brand"])
                 client["results"].append({
                     "prompt": p,
                     "mention": mention,
-                    "matched_keywords": keyword_matches,
                     "link": link,
+                    "matched_keywords": matched,
                     "position": position,
-                    "timestamp": datetime.datetime.now().isoformat(),
                     "response": response,
                     "recommendation": recommendation
                 })
             save_users(users)
 
-    if client["results"]:
-        df = pd.DataFrame(client["results"])
-        visibility = round(
-            (df["mention"].sum() * 50 + df["link"].sum() * 25 + df["position"].notna().sum() * 25)
-            / (len(df) * 100) * 100, 1
-        )
+        if client["results"]:
+            df = pd.DataFrame(client["results"])
+            st.dataframe(df[["prompt", "mention", "link", "matched_keywords", "position"]])
+            if st.button("📄 Generar informe PDF"):
+                pdf = generar_pdf_informe(df, client["brand"], "Presencia aceptable, pero se puede mejorar.")
+                st.download_button("⬇️ Descargar informe PDF", data=pdf, file_name="informe.pdf", mime="application/pdf")
 
-        st.markdown("### 📊 Dashboard de Visibilidad")
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("✅ % Mención", f"{(df['mention'].mean()*100):.1f}%")
-        col2.metric("🔗 % con enlace", f"{(df['link'].mean()*100):.1f}%")
-        col3.metric("📌 Posición media", f"{df['position'].dropna().mean():.1f}" if not df['position'].dropna().empty else "—")
-        col4.metric("🌟 Índice Visibilidad", f"{visibility}/100")
+    elif menu == "Palabras clave":
+        st.markdown("## 🔑 Palabras clave")
+        kws = st.text_area("Introduce palabras clave:", "\\n".join(client["keywords"]))
+        client["keywords"] = [k.strip() for k in kws.splitlines() if k.strip()]
+        save_users(users)
 
-        st.dataframe(df[["prompt", "mention", "matched_keywords", "link", "position", "timestamp"]])
-        st.download_button("⬇️ Exportar CSV", data=df.to_csv(index=False), file_name=f"{selected_client}_resultados.csv")
+    elif menu == "Importar CSV":
+        st.markdown("## 📥 Importar desde CSV")
+        file = st.file_uploader("Sube tu CSV (columna 'Consulta')", type=["csv"])
+        if file:
+            df = pd.read_csv(file)
+            if "Consulta" in df.columns:
+                nuevos = df["Consulta"].dropna().unique().tolist()
+                client["keywords"].extend([k for k in nuevos if k not in client["keywords"]])
+                client["keywords"] = sorted(set(client["keywords"]))
+                save_users(users)
+                st.success(f"{len(nuevos)} palabras clave añadidas.")
+            else:
+                st.error("CSV inválido: falta columna 'Consulta'.")
 
-        st.markdown("### 📈 Menciones por Prompt")
-        df["mención"] = df["mention"].apply(lambda x: "Sí" if x else "No")
-        fig = px.bar(df, x="prompt", color="mención", title="Aparición de marca por prompt")
-        st.plotly_chart(fig, use_container_width=True)
+    elif menu == "Prompts a trackear":
+        st.markdown("## ✍️ Prompts personalizados")
+        if st.button("➕ Añadir prompt"):
+            client["prompts"].append("")
+        for i, p in enumerate(client["prompts"]):
+            client["prompts"][i] = st.text_input(f"Prompt {i+1}", value=p, key=f"prompt_{i}")
+        sector = st.selectbox("Sector", ["educación", "salud", "legal", "ecommerce"])
+        sugerencias = sugerir_prompts(client["prompts"], sector)
+        st.markdown("### Sugerencias")
+        for s in sugerencias:
+            if st.button(f"Añadir: {s}"):
+                client["prompts"].append(s)
+        save_users(users)
 
-        st.markdown("### 🧠 Recomendaciones SEO")
-        for i, row in df.iterrows():
-            with st.expander(f"Prompt {i+1}: {row['prompt'][:40]}..."):
-                st.markdown(f"**Respuesta IA:**\n\n{row['response'][:1200]}")
-                st.markdown("---")
-                st.markdown(f"**Recomendación:**\n\n{row['recommendation']}")
+    elif menu == "Índice de Visibilidad":
+        st.markdown("## 🌐 Índice de Visibilidad")
+        if client["results"]:
+            df = pd.DataFrame(client["results"])
+            index = 0.5 * df["mention"].mean() + 0.3 * df["link"].mean() + 0.2 * df["position"].notna().mean()
+            dominan = [kw for kw in client["keywords"] if df["response"].str.contains(kw, case=False).any()]
+            st.metric("Dominan tus keywords", f"{len(dominan)} / {len(client['keywords'])}")
+            st.metric("Índice de visibilidad (0-1)", f"{index:.2f}")
+            st.metric("Menciones", f"{df['mention'].sum()} / {len(df)}")
+        else:
+            st.info("Ejecuta primero la simulación diaria.")
 
 # --- INICIO ---
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
-
 if st.session_state.authenticated:
     geo_tracker_dashboard()
 else:
     login_screen()
+"""
+
+with open("/mnt/data/geo_tracker_app.py", "w", encoding="utf-8") as f:
+    f.write(code)
+
+"/mnt/data/geo_tracker_app.py"
