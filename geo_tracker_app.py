@@ -127,10 +127,10 @@ def geo_tracker_dashboard():
     client["apis"]["openai"] = st.sidebar.text_input("OpenAI API Key", value=client["apis"].get("openai", ""), type="password")
     model = st.sidebar.selectbox("Modelo GPT", ["gpt-4", "gpt-3.5-turbo"])
     run = st.sidebar.button("🚀 Consultar IA")
-    st.markdown("### 🔑 Palabras clave principales")
-    keywords_str = st.text_area("Palabras clave", value="\n".join(client.get("keywords", [])), help="Introduce las palabras clave que deseas rastrear.")
-    client["keywords"] = [kw.strip() for kw in keywords_str.splitlines() if kw.strip()]
     save_users(users)
+
+    keywords_str = st.text_area("Palabras clave", "
+".join(client.get("keywords", [])))
     client["keywords"] = [kw.strip() for kw in keywords_str.splitlines() if kw.strip()]
     save_users(users)
 
