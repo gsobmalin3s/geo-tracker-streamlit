@@ -59,8 +59,13 @@ if selected_client == "➕ Crear nuevo":
         st.session_state.clients[new_name] = {
             "brand": "",
             "domain": "",
-            "prompts": ["" for _ in range(10)],
-            "results": []
+            "prompts": ["" for _ in range(4)],
+            "results": [],
+            "apis": {
+                "openai": "",
+                "gemini": None,
+                "claude": None
+            }
         }
         st.session_state.selected_client = new_name
         st.experimental_rerun()
@@ -74,9 +79,22 @@ client = st.session_state.clients[selected_client]
 
 # --- CONFIGURACIÓN ---
 st.sidebar.markdown("### ⚙️ Configuración")
-api_key = st.sidebar.text_input("🔑 API Key OpenAI", type="password")
 client["brand"] = st.sidebar.text_input("Marca", value=client.get("brand", ""))
 client["domain"] = st.sidebar.text_input("Dominio", value=client.get("domain", ""))
+
+# --- Imagen de perfil desde favicon ---
+if client.get("domain"):
+    domain_clean = client["domain"].replace("https://", "").replace("http://", "").split("/")[0]
+    favicon_url = f"https://www.google.com/s2/favicons?sz=64&domain={domain_clean}"
+    st.sidebar.image(favicon_url, width=32)
+
+# --- API por cliente ---
+st.sidebar.markdown("### 🔑 API Keys por cliente")
+client["apis"]["openai"] = st.sidebar.text_input("OpenAI API Key", value=client["apis"].get("openai", ""), type="password")
+st.sidebar.text_input("Gemini API Key (próximamente)", disabled=True)
+st.sidebar.text_input("Claude API Key (próximamente)", disabled=True)
+
+api_key = client["apis"]["openai"]
 model = st.sidebar.selectbox("Modelo GPT", ["gpt-4", "gpt-3.5-turbo"])
 run = st.sidebar.button("🚀 Consultar IA")
 
@@ -86,6 +104,10 @@ if client["brand"].lower() == "uoc":
 
 # --- PROMPTS PERSONALIZADOS ---
 st.markdown("### ✍️ Prompts personalizados")
+
+if st.button("➕ Añadir nuevo prompt"):
+    client["prompts"].append("")
+
 cols = st.columns(2)
 for i in range(len(client["prompts"])):
     with cols[i % 2]:
