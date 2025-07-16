@@ -1,7 +1,4 @@
-from pathlib import Path
 
-# Código completo actualizado con correcciones y visualización del índice de visibilidad
-geo_tracker_code = '''
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -40,7 +37,7 @@ def verify_password(password, hashed):
 
 def get_keyword_matches(text, keywords):
     text = text.lower()
-    return [kw for kw in keywords if re.search(rf'\\b{re.escape(kw.lower())}\\b', text)]
+    return [kw for kw in keywords if re.search(rf'\b{re.escape(kw.lower())}\b', text)]
 
 def generar_pdf_informe(df, brand):
     pdf = FPDF()
@@ -50,12 +47,12 @@ def generar_pdf_informe(df, brand):
     pdf.cell(200, 10, txt=f"Informe IA – {brand}", ln=True, align="C")
     pdf.ln(10)
     for i, row in df.iterrows():
-        pdf.multi_cell(0, 6, f"Prompt: {row['prompt']}\\n"
-                             f"Mención: {'Sí' if row['mention'] else 'No'}\\n"
-                             f"Enlace: {'Sí' if row['link'] else 'No'}\\n"
-                             f"Palabras clave: {', '.join(row['matched_keywords'])}\\n"
-                             f"Posición: {row['position'] or '—'}\\n"
-                             f"Recomendación: {row['recommendation']}\\n"
+        pdf.multi_cell(0, 6, f"Prompt: {row['prompt']}\n"
+                             f"Mención: {'Sí' if row['mention'] else 'No'}\n"
+                             f"Enlace: {'Sí' if row['link'] else 'No'}\n"
+                             f"Palabras clave: {', '.join(row['matched_keywords'])}\n"
+                             f"Posición: {row['position'] or '—'}\n"
+                             f"Recomendación: {row['recommendation']}\n"
                              f"{'-'*50}")
     pdf_output = BytesIO()
     pdf.output(pdf_output)
@@ -151,7 +148,7 @@ def geo_tracker_dashboard():
     save_users(users)
 
     st.markdown("### 🔑 Palabras clave principales")
-    keywords_str = st.text_area("Palabras clave (una por línea):", "\\n".join(client.get("keywords", [])), help="Introduce las palabras clave que deseas rastrear.")
+    keywords_str = st.text_area("Palabras clave (una por línea):", "\n".join(client.get("keywords", [])), help="Introduce las palabras clave que deseas rastrear.")
     client["keywords"] = [kw.strip() for kw in keywords_str.splitlines() if kw.strip()]
     save_users(users)
 
@@ -302,8 +299,3 @@ if st.session_state.authenticated:
     geo_tracker_dashboard()
 else:
     login_screen()
-'''
-
-file_path = "/mnt/data/geo_tracker_app.py"
-Path(file_path).write_text(geo_tracker_code, encoding="utf-8")
-file_path
