@@ -34,7 +34,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Sidebar config
-st.sidebar.image("/assets/logo-lin3s.jpg", width=160)
+st.sidebar.image("assets/logo-lin3s.jpg", width=160)
 st.sidebar.markdown("### 🧠 GEO Tracker Configuración")
 
 # Client switching
