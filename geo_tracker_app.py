@@ -168,6 +168,7 @@ if client["results"]:
 st.markdown("### 🧠 Recomendaciones SEO")
 for i, row in df.iterrows():
     with st.expander(f"Prompt {i+1}: {row['prompt'][:40]}..."):
-        st.markdown(f"""**Respuesta IA:**\n\n{row['response'][:1200]}""")
+        st.markdown(f"**Respuesta IA:**\n\n{row['response'][:1200]}")
         st.markdown("---")
-        st.markdown(f"""**Recomendación:**\n\n{row['recommendation']}""")
+        st.markdown(f"**Recomendación:**\n\n{row['recommendation']}")
+
