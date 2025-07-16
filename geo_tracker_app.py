@@ -43,7 +43,7 @@ def login_screen():
                 st.session_state.authenticated = True
                 st.session_state.username = username
                 st.success(f"¡Bienvenido, {username}!")
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.error("Usuario o contraseña incorrectos.")
 
@@ -67,12 +67,10 @@ def login_screen():
 def geo_tracker_dashboard():
     st.set_page_config(page_title="GEO Tracker PRO", layout="wide")
 
-    # Cargar usuario actual
     users = load_users()
     user = st.session_state.username
     clients = users[user]["clients"]
 
-    # Sidebar: logo y gestión de cliente
     logo_path = "assets/logo-lin3s.jpg"
     if os.path.exists(logo_path):
         st.sidebar.image(logo_path, width=160)
@@ -104,14 +102,13 @@ def geo_tracker_dashboard():
                 }
             }
             save_users(users)
-            st.experimental_rerun()
+            st.rerun()
 
     if selected_client not in clients:
         st.stop()
 
     client = clients[selected_client]
 
-    # Configuración
     st.sidebar.markdown("### ⚙️ Configuración")
     client["brand"] = st.sidebar.text_input("Marca", value=client.get("brand", ""))
     client["domain"] = st.sidebar.text_input("Dominio", value=client.get("domain", ""))
@@ -136,7 +133,6 @@ def geo_tracker_dashboard():
     if client["brand"].lower() == "uoc":
         aliases.append("universitat oberta de catalunya")
 
-    # Prompts
     st.markdown("### ✍️ Prompts personalizados")
     if st.button("➕ Añadir nuevo prompt"):
         client["prompts"].append("")
@@ -237,7 +233,7 @@ def geo_tracker_dashboard():
                 st.markdown("---")
                 st.markdown(f"**Recomendación:**\n\n{row['recommendation']}")
 
-# --- APP ENTRY POINT ---
+# --- PUNTO DE ENTRADA ---
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
