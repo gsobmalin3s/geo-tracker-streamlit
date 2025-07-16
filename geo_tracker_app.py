@@ -12,6 +12,7 @@ import re
 USER_DB = "data/users.json"
 os.makedirs("data", exist_ok=True)
 
+# --- Utilidades ---
 def load_users():
     if os.path.exists(USER_DB):
         with open(USER_DB, "r", encoding="utf-8") as f:
@@ -27,6 +28,10 @@ def hash_password(password):
 
 def verify_password(password, hashed):
     return hash_password(password) == hashed
+
+def get_keyword_matches(text, keywords):
+    text = text.lower()
+    return [kw for kw in keywords if re.search(rf'\b{re.escape(kw.lower())}\b', text)]
 
 def login_screen():
     st.title("🔐 GEO Tracker PRO")
@@ -91,7 +96,8 @@ def geo_tracker_dashboard():
                 "domain": "",
                 "prompts": ["" for _ in range(4)],
                 "results": [],
-                "apis": {"openai": ""}
+                "apis": {"openai": ""},
+                "keywords": []
             }
             save_users(users)
             st.rerun()
@@ -117,20 +123,27 @@ def geo_tracker_dashboard():
     model = st.sidebar.selectbox("Modelo GPT", ["gpt-4", "gpt-3.5-turbo"])
     run = st.sidebar.button("🚀 Consultar IA")
 
-    # Aliases expandidos
-    aliases = set()
-    brand = client["brand"].strip().lower()
-    domain = client["domain"].strip().lower().replace("https://", "").replace("http://", "").split("/")[0]
-    aliases.add(brand)
-    if domain:
-        aliases.add(domain)
-    if "uoc" in brand or "universitat oberta" in brand:
-        aliases.update([
-            "uoc", "www.uoc.edu", "universitat oberta",
-            "universitat oberta de catalunya",
-            "universitat oberta de cataluña",
-            "uoc.edu"
-        ])
+    # Palabras clave manuales
+    st.markdown("### 🔑 Palabras clave principales")
+    keywords_str = st.text_area("Palabras clave (una por línea):", "\n".join(client.get("keywords", [])))
+    client["keywords"] = [kw.strip() for kw in keywords_str.splitlines() if kw.strip()]
+    save_users(users)
+
+    # NUEVO: importar keywords desde CSV de Search Console
+    st.markdown("### 📥 Importar palabras clave desde Search Console")
+    uploaded_file = st.file_uploader("Sube un CSV exportado desde GSC", type=["csv"])
+    if uploaded_file is not None:
+        try:
+            df_keywords = pd.read_csv(uploaded_file)
+            if "Consulta" in df_keywords.columns:
+                new_keywords = df_keywords["Consulta"].dropna().unique().tolist()
+                client["keywords"].extend([kw for kw in new_keywords if kw not in client["keywords"]])
+                st.success(f"{len(new_keywords)} palabras clave añadidas.")
+                save_users(users)
+            else:
+                st.error("El archivo no tiene una columna 'Consulta'. ¿Has exportado correctamente desde GSC?")
+        except Exception as e:
+            st.error(f"Error al leer el archivo: {e}")
 
     st.markdown("### ✍️ Prompts personalizados")
     if st.button("➕ Añadir nuevo prompt"):
@@ -171,8 +184,8 @@ def geo_tracker_dashboard():
             st.warning("No se pudo generar la recomendación.")
             return "No disponible"
 
-    valid_prompts = [p for p in client["prompts"] if p.strip()]
     if run:
+        valid_prompts = [p for p in client["prompts"] if p.strip()]
         if not api_key:
             st.warning("⚠️ Debes introducir una API Key válida de OpenAI.")
         elif not client["brand"]:
@@ -186,17 +199,19 @@ def geo_tracker_dashboard():
                 if not response:
                     continue
                 response_lower = response.lower()
-                mention = any(re.search(rf'\b{re.escape(alias)}\b', response_lower) for alias in aliases)
+                keyword_matches = get_keyword_matches(response_lower, client.get("keywords", []))
+                mention = len(keyword_matches) > 0
                 link = "http" in response_lower
                 position = None
                 for i, line in enumerate(response.splitlines()):
-                    if any(re.search(rf'\b{re.escape(alias)}\b', line.lower()) for alias in aliases) and line.strip().split(" ")[0].isdigit():
+                    if any(re.search(rf'\b{re.escape(k)}\b', line.lower()) for k in keyword_matches) and line.strip().split(" ")[0].isdigit():
                         position = i + 1
                         break
                 recommendation = generate_recommendation(p, client["brand"], response)
                 client["results"].append({
                     "prompt": p,
                     "mention": mention,
+                    "matched_keywords": keyword_matches,
                     "link": link,
                     "position": position,
                     "timestamp": datetime.datetime.now().isoformat(),
@@ -219,7 +234,7 @@ def geo_tracker_dashboard():
         col3.metric("📌 Posición media", f"{df['position'].dropna().mean():.1f}" if not df['position'].dropna().empty else "—")
         col4.metric("🌟 Índice Visibilidad", f"{visibility}/100")
 
-        st.dataframe(df[["prompt", "mention", "link", "position", "timestamp"]])
+        st.dataframe(df[["prompt", "mention", "matched_keywords", "link", "position", "timestamp"]])
         st.download_button("⬇️ Exportar CSV", data=df.to_csv(index=False), file_name=f"{selected_client}_resultados.csv")
 
         st.markdown("### 📈 Menciones por Prompt")
