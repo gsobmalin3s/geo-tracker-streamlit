@@ -65,11 +65,8 @@ if selected_client not in st.session_state.clients:
 client = st.session_state.clients[selected_client]
 
 # --- PERFIL DEL CLIENTE ---
-st.markdown(f"## {client['brand']}")
-st.image(client["favicon"], width=32)
-st.markdown(f"**Dominio:** {client['domain']}  
-**Sector:** {client['sector']}  
-{client['description']}")
+st.markdown(f"**Dominio:** {client['domain']}  \n**Sector:** {client['sector']}  \n**Descripción:** {client['description']}")
+
 
 # --- CONFIGURACIÓN ---
 st.sidebar.markdown("### ⚙️ Configuración")
