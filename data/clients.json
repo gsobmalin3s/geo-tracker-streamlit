@@ -1,0 +1,13 @@
+{
+  "EjemploCliente": {
+    "brand": "MiMarca",
+    "domain": "https://ejemplo.com",
+    "prompts": ["¿Quién es MiMarca?", "Opiniones sobre MiMarca"],
+    "results": [],
+    "apis": {
+      "openai": "sk-...",
+      "gemini": null,
+      "claude": null
+    }
+  }
+}
