@@ -1,3 +1,4 @@
+# Este archivo usa el cliente OpenAI >= 1.0.0 con client.chat.completions.create()
 
 import streamlit as st
 import pandas as pd
@@ -6,7 +7,7 @@ import datetime
 import hashlib
 import json
 import os
-import openai
+from openai import OpenAI
 import re
 from fpdf import FPDF
 from io import BytesIO
@@ -182,8 +183,8 @@ def geo_tracker_dashboard():
 
     def call_openai(prompt):
         try:
-            openai.api_key = api_key
-            response = openai.ChatCompletion.create(
+            client = OpenAI(api_key=api_key)
+            response = client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7
@@ -201,8 +202,8 @@ def geo_tracker_dashboard():
             f"Da recomendaciones claras."
         )
         try:
-            openai.api_key = api_key
-            rec_response = openai.ChatCompletion.create(
+            client = OpenAI(api_key=api_key)
+            rec_response = client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": analysis_prompt}],
                 temperature=0.7
