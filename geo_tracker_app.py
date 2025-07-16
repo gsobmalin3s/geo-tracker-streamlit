@@ -1,7 +1,5 @@
-# Limpiar el contenido, eliminando las líneas problemáticas que intentan escribir archivos desde el script.
-fixed_code = """
-# geo_tracker_app.py
-
+# Guardar el archivo geo_tracker_app.py corregido, sin triple comillas ni asignaciones
+clean_code = """
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -75,12 +73,12 @@ def generar_pdf_informe(df, brand, conclusion):
     pdf.set_font("Arial", size=10)
     pdf.ln(10)
     for i, row in df.iterrows():
-        pdf.multi_cell(0, 6, f"Prompt: {row['prompt']}\n"
-                             f"Mención: {'Sí' if row['mention'] else 'No'}\n"
-                             f"Enlace: {'Sí' if row['link'] else 'No'}\n"
-                             f"Palabras clave: {', '.join(row['matched_keywords'])}\n"
-                             f"Posición: {row['position'] or '—'}\n"
-                             f"Recomendación: {row['recommendation']}\n"
+        pdf.multi_cell(0, 6, f"Prompt: {row['prompt']}\\n"
+                             f"Mención: {'Sí' if row['mention'] else 'No'}\\n"
+                             f"Enlace: {'Sí' if row['link'] else 'No'}\\n"
+                             f"Palabras clave: {', '.join(row['matched_keywords'])}\\n"
+                             f"Posición: {row['position'] or '—'}\\n"
+                             f"Recomendación: {row['recommendation']}\\n"
                              f"{'-'*50}")
     pdf.ln(8)
     pdf.set_font("Arial", style='B', size=12)
@@ -247,4 +245,7 @@ else:
     login_screen()
 """
 
+with open("/mnt/data/geo_tracker_app.py", "w", encoding="utf-8") as f:
+    f.write(clean_code)
 
+"/mnt/data/geo_tracker_app.py"
