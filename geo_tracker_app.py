@@ -1,5 +1,3 @@
-# Guardar el archivo geo_tracker_app.py corregido, sin triple comillas ni asignaciones
-clean_code = """
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -35,7 +33,7 @@ def verify_password(password, hashed):
 
 def get_keyword_matches(text, keywords):
     text = text.lower()
-    return [kw for kw in keywords if re.search(rf'\\b{re.escape(kw.lower())}\\b', text)]
+    return [kw for kw in keywords if re.search(rf'\b{re.escape(kw.lower())}\b', text)]
 
 def simulate_ai_response(prompt, model_name):
     examples = {
@@ -73,12 +71,12 @@ def generar_pdf_informe(df, brand, conclusion):
     pdf.set_font("Arial", size=10)
     pdf.ln(10)
     for i, row in df.iterrows():
-        pdf.multi_cell(0, 6, f"Prompt: {row['prompt']}\\n"
-                             f"Mención: {'Sí' if row['mention'] else 'No'}\\n"
-                             f"Enlace: {'Sí' if row['link'] else 'No'}\\n"
-                             f"Palabras clave: {', '.join(row['matched_keywords'])}\\n"
-                             f"Posición: {row['position'] or '—'}\\n"
-                             f"Recomendación: {row['recommendation']}\\n"
+        pdf.multi_cell(0, 6, f"Prompt: {row['prompt']}\n"
+                             f"Mención: {'Sí' if row['mention'] else 'No'}\n"
+                             f"Enlace: {'Sí' if row['link'] else 'No'}\n"
+                             f"Palabras clave: {', '.join(row['matched_keywords'])}\n"
+                             f"Posición: {row['position'] or '—'}\n"
+                             f"Recomendación: {row['recommendation']}\n"
                              f"{'-'*50}")
     pdf.ln(8)
     pdf.set_font("Arial", style='B', size=12)
@@ -192,7 +190,7 @@ def geo_tracker_dashboard():
 
     elif menu == "Palabras clave":
         st.markdown("## 🔑 Palabras clave")
-        kws = st.text_area("Introduce palabras clave:", "\\n".join(client["keywords"]))
+        kws = st.text_area("Introduce palabras clave:", "\n".join(client["keywords"]))
         client["keywords"] = [k.strip() for k in kws.splitlines() if k.strip()]
         save_users(users)
 
@@ -234,4 +232,12 @@ def geo_tracker_dashboard():
             st.metric("Índice de visibilidad (0-1)", f"{index:.2f}")
             st.metric("Menciones", f"{df['mention'].sum()} / {len(df)}")
         else:
-            st.info("Ejecuta primero la simulación diaria.")"""
+            st.info("Ejecuta primero la simulación diaria.")
+
+# --- INICIO ---
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+if st.session_state.authenticated:
+    geo_tracker_dashboard()
+else:
+    login_screen()
