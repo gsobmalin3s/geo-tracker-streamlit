@@ -1,3 +1,7 @@
+from pathlib import Path
+
+# Código completo actualizado con correcciones y visualización del índice de visibilidad
+geo_tracker_code = '''
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -36,7 +40,7 @@ def verify_password(password, hashed):
 
 def get_keyword_matches(text, keywords):
     text = text.lower()
-    return [kw for kw in keywords if re.search(rf'\b{re.escape(kw.lower())}\b', text)]
+    return [kw for kw in keywords if re.search(rf'\\b{re.escape(kw.lower())}\\b', text)]
 
 def generar_pdf_informe(df, brand):
     pdf = FPDF()
@@ -46,12 +50,12 @@ def generar_pdf_informe(df, brand):
     pdf.cell(200, 10, txt=f"Informe IA – {brand}", ln=True, align="C")
     pdf.ln(10)
     for i, row in df.iterrows():
-        pdf.multi_cell(0, 6, f"Prompt: {row['prompt']}\n"
-                             f"Mención: {'Sí' if row['mention'] else 'No'}\n"
-                             f"Enlace: {'Sí' if row['link'] else 'No'}\n"
-                             f"Palabras clave: {', '.join(row['matched_keywords'])}\n"
-                             f"Posición: {row['position'] or '—'}\n"
-                             f"Recomendación: {row['recommendation']}\n"
+        pdf.multi_cell(0, 6, f"Prompt: {row['prompt']}\\n"
+                             f"Mención: {'Sí' if row['mention'] else 'No'}\\n"
+                             f"Enlace: {'Sí' if row['link'] else 'No'}\\n"
+                             f"Palabras clave: {', '.join(row['matched_keywords'])}\\n"
+                             f"Posición: {row['position'] or '—'}\\n"
+                             f"Recomendación: {row['recommendation']}\\n"
                              f"{'-'*50}")
     pdf_output = BytesIO()
     pdf.output(pdf_output)
@@ -147,7 +151,7 @@ def geo_tracker_dashboard():
     save_users(users)
 
     st.markdown("### 🔑 Palabras clave principales")
-    keywords_str = st.text_area("Palabras clave (una por línea):", "\n".join(client.get("keywords", [])), help="Introduce las palabras clave que deseas rastrear.")
+    keywords_str = st.text_area("Palabras clave (una por línea):", "\\n".join(client.get("keywords", [])), help="Introduce las palabras clave que deseas rastrear.")
     client["keywords"] = [kw.strip() for kw in keywords_str.splitlines() if kw.strip()]
     save_users(users)
 
@@ -251,6 +255,45 @@ def geo_tracker_dashboard():
         df = pd.DataFrame(client["results"])
         mostrar_dashboard_final(df, client, selected_client)
 
+def mostrar_dashboard_final(df, client, selected_client):
+    st.markdown("## 📊 Resultados del análisis")
+
+    df_show = df.copy()
+    df_show["matched_keywords"] = df_show["matched_keywords"].apply(lambda x: ", ".join(x))
+    st.dataframe(df_show[["prompt", "mention", "link", "matched_keywords", "position", "recommendation"]], use_container_width=True)
+
+    st.markdown("### 📄 Descargar informe en PDF")
+    if st.button("📥 Generar PDF"):
+        pdf = generar_pdf_informe(df, client["brand"])
+        st.download_button("Descargar Informe", data=pdf, file_name=f"informe_{client['brand']}.pdf", mime="application/pdf")
+
+    st.markdown("### 🌍 Índice de visibilidad GEO (por prompt)")
+
+    def calcular_indice(row):
+        score = 0
+        if row["mention"]:
+            score += 1
+        if row["link"]:
+            score += 1
+        if row["position"] and isinstance(row["position"], int):
+            score += max(0, 5 - row["position"]) * 0.5
+        score += len(row["matched_keywords"]) * 0.3
+        return round(score, 2)
+
+    df["visibilidad_geo"] = df.apply(calcular_indice, axis=1)
+
+    fig = px.bar(
+        df,
+        x="prompt",
+        y="visibilidad_geo",
+        color="visibilidad_geo",
+        labels={"visibilidad_geo": "Índice de Visibilidad"},
+        title="Visibilidad GEO por Prompt",
+        text="visibilidad_geo"
+    )
+    fig.update_layout(xaxis_title="Prompt", yaxis_title="Índice", height=500)
+    st.plotly_chart(fig, use_container_width=True)
+
 # --- INICIO ---
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
@@ -259,3 +302,8 @@ if st.session_state.authenticated:
     geo_tracker_dashboard()
 else:
     login_screen()
+'''
+
+file_path = "/mnt/data/geo_tracker_app.py"
+Path(file_path).write_text(geo_tracker_code, encoding="utf-8")
+file_path
