@@ -234,4 +234,4 @@ def geo_tracker_dashboard():
             st.metric("Índice de visibilidad (0-1)", f"{index:.2f}")
             st.metric("Menciones", f"{df['mention'].sum()} / {len(df)}")
         else:
-            st.info("Ejecuta primero la simulación diaria.")
+            st.info("Ejecuta primero la simulación diaria.")"""
