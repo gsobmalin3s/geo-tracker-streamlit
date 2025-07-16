@@ -1,12 +1,11 @@
+# Volver a generar el archivo eliminando toda lógica relacionada con OpenAI,
+# dejando solo el sistema de login, registro, cierre de sesión y estructura base
+
+python_code_no_openai = """
 import streamlit as st
-import pandas as pd
-import plotly.express as px
-import datetime
 import hashlib
 import json
 import os
-import openai
-import re
 
 # --- RUTAS ---
 USER_DB = "data/users.json"
@@ -29,46 +28,18 @@ def hash_password(password):
 def verify_password(password, hashed):
     return hash_password(password) == hashed
 
-# --- Coincidencia de palabras clave (si se usa más adelante) ---
-def get_keyword_matches(text, keywords):
-    text = text.lower()
-    return [kw for kw in keywords if re.search(rf'\b{re.escape(kw.lower())}\b', text)]
-
-# --- Llamada a OpenAI con caché ---
-def call_openai_cached(prompt, api_key, model):
-    if "openai_cache" not in st.session_state:
-        st.session_state.openai_cache = {}
-    key = (prompt, model)
-    if key in st.session_state.openai_cache:
-        return st.session_state.openai_cache[key]
-    try:
-        openai.api_key = api_key
-        response = openai.ChatCompletion.create(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7
-        )
-        content = response['choices'][0]['message']['content']
-        st.session_state.openai_cache[key] = content
-        return content
-    except Exception as e:
-        st.error(f"Error al consultar OpenAI: {e}")
-        return None
-
 # --- Configuración de página ---
-st.set_page_config(page_title="App OpenAI Segura", layout="centered")
-st.title("🔐 Sistema con Login + OpenAI")
+st.set_page_config(page_title="Sistema de Login", layout="centered")
+st.title("🔐 Sistema de Login Seguro")
 
 # --- Manejo de sesión ---
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "username" not in st.session_state:
     st.session_state.username = ""
-if "api_key" not in st.session_state:
-    st.session_state.api_key = ""
 
 # --- Interfaz principal ---
-menu = st.sidebar.radio("Menú", ["Iniciar sesión", "Registrar", "OpenAI", "Cerrar sesión"])
+menu = st.sidebar.radio("Menú", ["Iniciar sesión", "Registrar", "Cerrar sesión"])
 
 users = load_users()
 
@@ -90,13 +61,11 @@ elif menu == "Iniciar sesión":
     st.subheader("🔑 Iniciar sesión")
     username = st.text_input("Usuario")
     password = st.text_input("Contraseña", type="password")
-    api_key = st.text_input("API Key de OpenAI", type="password")
 
     if st.button("Entrar"):
         if username in users and verify_password(password, users[username]):
             st.session_state.logged_in = True
             st.session_state.username = username
-            st.session_state.api_key = api_key
             st.success(f"Bienvenido, {username}")
         else:
             st.error("Usuario o contraseña incorrectos.")
@@ -105,37 +74,18 @@ elif menu == "Iniciar sesión":
 elif menu == "Cerrar sesión":
     st.session_state.logged_in = False
     st.session_state.username = ""
-    st.session_state.api_key = ""
     st.success("Sesión cerrada.")
 
-# --- Consulta a OpenAI ---
-elif menu == "OpenAI":
-    if not st.session_state.logged_in:
-        st.warning("Debes iniciar sesión primero.")
-    else:
-        st.subheader(f"👋 Hola, {st.session_state.username}")
-        st.write("Consulta segura a OpenAI")
+# --- Área protegida ---
+if st.session_state.logged_in:
+    st.subheader("🎉 Bienvenido al área privada")
+    st.markdown(f"Usuario: **{st.session_state.username}**")
+else:
+    st.info("Por favor, inicia sesión para acceder al contenido.")
+"""
 
-        prompt = st.text_area("🧠 Prompt")
-        model = st.selectbox("Modelo", ["gpt-3.5-turbo", "gpt-4"])
+path_clean_login = "/mnt/data/app_login_solo.py"
+with open(path_clean_login, "w", encoding="utf-8") as f:
+    f.write(python_code_no_openai)
 
-        if st.button("Enviar"):
-            if not prompt.strip():
-                st.warning("El prompt está vacío.")
-            else:
-                result = call_openai_cached(prompt, st.session_state.api_key, model)
-                if result:
-                    st.success("Respuesta de OpenAI:")
-                    st.markdown(result)
-                else:
-                    st.error("No se obtuvo respuesta.")
-        
-        # Historial simple
-        if "openai_cache" in st.session_state:
-            st.subheader("📜 Historial (caché)")
-            for key, val in list(st.session_state.openai_cache.items())[-5:][::-1]:
-                st.markdown(f"**Prompt:** `{key[0][:30]}...`  \n**Modelo:** {key[1]}  \n> {val[:300]}...")
-
-# --- Footer ---
-st.markdown("---")
-st.markdown("📦 Proyecto de ejemplo con Streamlit + OpenAI")
+path_clean_login
