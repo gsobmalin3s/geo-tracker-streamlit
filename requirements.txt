@@ -1,5 +1,7 @@
-streamlit>=1.30
-openai>=1.0.0
+streamlit>=1.25
 pandas>=1.5
-plotly>=5.5
-fpdf2>=2.7.6
+plotly>=5.15
+openai>=1.0.0
+fpdf>=1.7
+kaleido>=0.2.1
+matplotlib>=3.7
