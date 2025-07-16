@@ -40,9 +40,23 @@ client_options = list(st.session_state.clients.keys())
 selected_client = st.sidebar.selectbox("Selecciona cliente", client_options + ["➕ Crear nuevo"], index=0 if client_options else len(client_options))
 
 if selected_client == "➕ Crear nuevo":
-    new_name = st.sidebar.text_input("Nombre del nuevo cliente")
+    new_name = st.sidebar.text_input("Nombre de la marca")
+    new_domain = st.sidebar.text_input("Dominio")
+    new_sector = st.sidebar.text_input("Sector")
+    new_desc = st.sidebar.text_area("Descripción breve")
+    new_api = st.sidebar.text_input("🔑 API Key OpenAI", type="password")
     if st.sidebar.button("Crear cliente") and new_name:
-        st.session_state.clients[new_name] = {"brand": "", "domain": "", "prompts": ["" for _ in range(10)], "results": []}
+        favicon_url = f"https://www.google.com/s2/favicons?domain={new_domain}"
+        st.session_state.clients[new_name] = {
+            "brand": new_name,
+            "domain": new_domain,
+            "sector": new_sector,
+            "description": new_desc,
+            "api_key": new_api,
+            "favicon": favicon_url,
+            "prompts": ["" for _ in range(10)],
+            "results": []
+        }
         selected_client = new_name
 
 if selected_client not in st.session_state.clients:
@@ -50,11 +64,15 @@ if selected_client not in st.session_state.clients:
 
 client = st.session_state.clients[selected_client]
 
+# --- PERFIL DEL CLIENTE ---
+st.markdown(f"## {client['brand']}")
+st.image(client["favicon"], width=32)
+st.markdown(f"**Dominio:** {client['domain']}  
+**Sector:** {client['sector']}  
+{client['description']}")
+
 # --- CONFIGURACIÓN ---
 st.sidebar.markdown("### ⚙️ Configuración")
-api_key = st.sidebar.text_input("🔑 API Key OpenAI", type="password")
-client["brand"] = st.sidebar.text_input("Marca", value=client["brand"])
-client["domain"] = st.sidebar.text_input("Dominio", value=client["domain"])
 model = st.sidebar.selectbox("Modelo GPT", ["gpt-4", "gpt-3.5-turbo"])
 run = st.sidebar.button("🚀 Consultar IA")
 
@@ -71,9 +89,9 @@ for i in range(len(client["prompts"])):
         client["prompts"][i] = value
 
 # --- CONSULTA GPT ---
-def call_openai(prompt):
+def call_openai(prompt, key):
     try:
-        openai.api_key = api_key
+        openai.api_key = key
         response = openai.ChatCompletion.create(
             model=model,
             messages=[{"role": "user", "content": prompt}],
@@ -83,9 +101,10 @@ def call_openai(prompt):
     except Exception as e:
         return f"ERROR: {e}"
 
-def generate_recommendation(prompt, brand, response):
+def generate_recommendation(prompt, brand, response, key):
     analysis_prompt = f"""Este es un análisis SEO para IA. Prompt original: "{prompt}". Marca: "{brand}". Respuesta de la IA: "{response[:1000]}". ¿Qué debería mejorar esta marca para aparecer mejor posicionada en esta respuesta de IA? Da recomendaciones claras."""
     try:
+        openai.api_key = key
         rec_response = openai.ChatCompletion.create(
             model=model,
             messages=[{"role": "user", "content": analysis_prompt}],
@@ -95,19 +114,19 @@ def generate_recommendation(prompt, brand, response):
     except:
         return "No disponible"
 
-if run and api_key and client["brand"]:
+if run and client["api_key"] and client["brand"]:
     client["results"] = []
     for p in client["prompts"]:
         if not p.strip(): continue
-        response = call_openai(p)
+        response = call_openai(p, client["api_key"])
         mention = any(alias.lower() in response.lower() for alias in aliases)
-        link = "http" in response
+        link = "http" in response and client["domain"] in response
         position = None
         for i, line in enumerate(response.splitlines()):
             if any(alias.lower() in line.lower() for alias in aliases) and line.strip().startswith(str(i+1)):
                 position = i + 1
                 break
-        recommendation = generate_recommendation(p, client["brand"], response)
+        recommendation = generate_recommendation(p, client["brand"], response, client["api_key"])
         client["results"].append({
             "prompt": p,
             "mention": mention,
@@ -145,6 +164,10 @@ if client["results"]:
     st.markdown("### 🧠 Recomendaciones SEO")
     for i, row in df.iterrows():
         with st.expander(f"Prompt {i+1}: {row['prompt'][:40]}..."):
-            st.markdown(f"**Respuesta IA:**\n\n{row['response'][:1200]}")
+            st.markdown(f"**Respuesta IA:**
+
+{row['response'][:1200]}")
             st.markdown("---")
-            st.markdown(f"**Recomendación:**\n\n{row['recommendation']}")
+            st.markdown(f"**Recomendación:**
+
+{row['recommendation']}")
