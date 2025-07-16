@@ -30,7 +30,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- GESTIÓN DE CLIENTES ---
-st.sidebar.image("https://upload.wikimedia.org/wikipedia/commons/6/69/LIN3S_logo.svg", width=160)
+st.sidebar.image("assets/logo-lin3s.jpg", width=160)
 st.sidebar.markdown("### 👥 Cliente")
 
 if "clients" not in st.session_state:
