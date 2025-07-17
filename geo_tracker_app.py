@@ -126,15 +126,15 @@ def geo_tracker_dashboard():
 
     client = clients[selected_client]
     st.sidebar.markdown("### ⚙️ Configuración")
-    client["brand"] = st.sidebar.text_input("Marca", value=client.get("brand", ""), help="Nombre de la marca a analizar. Se usará en los prompts y recomendaciones.")
-    client["domain"] = st.sidebar.text_input("Dominio", value=client.get("domain", ""), help="URL del sitio del cliente. Se usa para extraer el favicon y verificar menciones en la IA.")
+    client["brand"] = st.sidebar.text_input("Marca", value=client.get("brand", ""))
+    client["domain"] = st.sidebar.text_input("Dominio", value=client.get("domain", ""))
     if client.get("domain"):
         domain_clean = client["domain"].replace("https://", "").replace("http://", "").split("/")[0]
         favicon_url = f"https://www.google.com/s2/favicons?sz=64&domain={domain_clean}"
         st.sidebar.image(favicon_url, width=32)
 
     st.sidebar.markdown("### 🔑 API Keys por cliente")
-    client["apis"]["openai"] = st.sidebar.text_input("OpenAI API Key", value=client["apis"].get("openai", ""), type="password", help="Tu clave de API personal de OpenAI. Puedes obtenerla en https://platform.openai.com")
+    client["apis"]["openai"] = st.sidebar.text_input("OpenAI API Key", value=client["apis"].get("openai", ""), type="password")
     st.sidebar.text_input("Gemini API (próximamente)", disabled=True)
     st.sidebar.text_input("Perplexity API (próximamente)", disabled=True)
     api_key = client["apis"]["openai"]
@@ -143,26 +143,23 @@ def geo_tracker_dashboard():
     save_users(users)
 
     st.markdown("### 🔑 Palabras clave principales")
-    keywords_str = st.text_area("Palabras clave (una por línea):", "\n".join(client.get("keywords", [])), help="Introduce una palabra clave por línea. Se detectarán en las respuestas de IA.")
+    keywords_str = st.text_area("Palabras clave (una por línea):", "\n".join(client.get("keywords", [])))
     client["keywords"] = [kw.strip() for kw in keywords_str.splitlines() if kw.strip()]
     save_users(users)
 
-    st.markdown("### 📅 Importar palabras clave desde Search Console")
-    uploaded_file = st.file_uploader("Sube un archivo CSV o Excel exportado desde Search Console (con columna 'Consulta')", type=["csv", "xlsx"])
+    st.markdown("### 📥 Importar palabras clave desde Search Console")
+    uploaded_file = st.file_uploader("Sube un CSV exportado desde GSC", type=["csv"])
     if uploaded_file is not None:
         try:
-            if uploaded_file.name.endswith(".csv"):
-                df_keywords = pd.read_csv(uploaded_file)
-            else:
-                df_keywords = pd.read_excel(uploaded_file)
+            df_keywords = pd.read_csv(uploaded_file)
             if "Consulta" in df_keywords.columns:
                 new_keywords = df_keywords["Consulta"].dropna().unique().tolist()
                 client["keywords"].extend([kw for kw in new_keywords if kw not in client["keywords"]])
                 client["keywords"] = sorted(set(client["keywords"]))
-                st.success(f"{len(new_keywords)} palabras clave añadidas desde archivo.")
+                st.success(f"{len(new_keywords)} palabras clave añadidas.")
                 save_users(users)
             else:
-                st.error("El archivo debe contener una columna llamada 'Consulta'.")
+                st.error("El archivo no tiene una columna 'Consulta'.")
         except Exception as e:
             st.error(f"Error al leer el archivo: {e}")
 
@@ -174,20 +171,14 @@ def geo_tracker_dashboard():
     cols = st.columns(2)
     for i in range(len(client["prompts"])):
         with cols[i % 2]:
-            value = st.text_area(
-                f"Prompt #{i+1}",
-                client["prompts"][i],
-                height=80,
-                key=f"prompt_{i}",
-                help="Consulta personalizada para el modelo de IA. Usa el nombre de la marca y un enfoque SEO." if i == 0 else None
-            )
+            value = st.text_area(f"Prompt #{i+1}", client["prompts"][i], height=80, key=f"prompt_{i}")
             client["prompts"][i] = value
     save_users(users)
 
     def call_openai(prompt):
         try:
-            openai.api_key = api_key
-            response = openai.ChatCompletion.create(
+            openai_client = openai.OpenAI(api_key=api_key)
+            response = openai_client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7
@@ -205,8 +196,8 @@ def geo_tracker_dashboard():
             f"Da recomendaciones claras."
         )
         try:
-            openai.api_key = api_key
-            rec_response = openai.ChatCompletion.create(
+            openai_client = openai.OpenAI(api_key=api_key)
+            rec_response = openai_client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": analysis_prompt}],
                 temperature=0.7
@@ -255,6 +246,7 @@ def geo_tracker_dashboard():
     if client.get("results"):
         df = pd.DataFrame(client["results"])
 
+        # --- Gráfico Índice Visibilidad GEO ---
         df['score'] = df.apply(lambda row: (1 if row['mention'] else 0) + (1 if row['link'] else 0), axis=1)
         df['score'] += df['position'].apply(lambda x: max(0, 3 - int(x)) if pd.notnull(x) else 0)
         df['timestamp'] = pd.to_datetime(df['timestamp'])
@@ -267,15 +259,15 @@ def geo_tracker_dashboard():
 
         st.plotly_chart(fig, use_container_width=True)
 
+        # Mostrar tabla
         st.markdown("### 📊 Resultados")
         st.dataframe(df)
 
-        st.markdown("### 📄 Generar informe PDF")
-        if st.button("📅 Generar informe completo"):
-            pdf = generar_pdf_informe(df, client["brand"])
-            st.download_button(
-                label="📌 Descargar informe PDF",
-                data=pdf,
-                file_name=f"Informe_{client['brand']}.pdf",
-                mime="application/pdf"
-            )
+# --- INICIO ---
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+if st.session_state.authenticated:
+    geo_tracker_dashboard()
+else:
+    login_screen()
