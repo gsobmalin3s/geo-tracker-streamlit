@@ -183,7 +183,8 @@ def geo_tracker_dashboard():
             )
             client["prompts"][i] = value
     save_users(users)
-        def call_openai(prompt):
+
+    def call_openai(prompt):
         try:
             openai_client = openai.OpenAI(api_key=api_key)
             response = openai_client.chat.completions.create(
