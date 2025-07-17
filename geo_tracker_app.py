@@ -186,8 +186,8 @@ def geo_tracker_dashboard():
 
     def call_openai(prompt):
         try:
-            openai_client = openai.OpenAI(api_key=api_key)
-            response = openai_client.chat.completions.create(
+            openai.api_key = api_key
+            response = openai.ChatCompletion.create(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7
@@ -205,8 +205,8 @@ def geo_tracker_dashboard():
             f"Da recomendaciones claras."
         )
         try:
-            openai_client = openai.OpenAI(api_key=api_key)
-            rec_response = openai_client.chat.completions.create(
+            openai.api_key = api_key
+            rec_response = openai.ChatCompletion.create(
                 model=model,
                 messages=[{"role": "user", "content": analysis_prompt}],
                 temperature=0.7
