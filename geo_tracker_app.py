@@ -147,6 +147,25 @@ def geo_tracker_dashboard():
     client["keywords"] = [kw.strip() for kw in keywords_str.splitlines() if kw.strip()]
     save_users(users)
 
+    st.markdown("### 📅 Importar palabras clave desde Search Console")
+    uploaded_file = st.file_uploader("Sube un archivo CSV o Excel exportado desde Search Console (con columna 'Consulta')", type=["csv", "xlsx"])
+    if uploaded_file is not None:
+        try:
+            if uploaded_file.name.endswith(".csv"):
+                df_keywords = pd.read_csv(uploaded_file)
+            else:
+                df_keywords = pd.read_excel(uploaded_file)
+            if "Consulta" in df_keywords.columns:
+                new_keywords = df_keywords["Consulta"].dropna().unique().tolist()
+                client["keywords"].extend([kw for kw in new_keywords if kw not in client["keywords"]])
+                client["keywords"] = sorted(set(client["keywords"]))
+                st.success(f"{len(new_keywords)} palabras clave añadidas desde archivo.")
+                save_users(users)
+            else:
+                st.error("El archivo debe contener una columna llamada 'Consulta'.")
+        except Exception as e:
+            st.error(f"Error al leer el archivo: {e}")
+
     st.markdown("### ✍️ Prompts personalizados")
     if st.button("➕ Añadir nuevo prompt"):
         client["prompts"].append("")
@@ -155,11 +174,16 @@ def geo_tracker_dashboard():
     cols = st.columns(2)
     for i in range(len(client["prompts"])):
         with cols[i % 2]:
-            value = st.text_area(f"Prompt #{i+1}", client["prompts"][i], height=80, key=f"prompt_{i}", help="Consulta personalizada para el modelo de IA. Usa el nombre de la marca y un enfoque SEO.")
+            value = st.text_area(
+                f"Prompt #{i+1}",
+                client["prompts"][i],
+                height=80,
+                key=f"prompt_{i}",
+                help="Consulta personalizada para el modelo de IA. Usa el nombre de la marca y un enfoque SEO." if i == 0 else None
+            )
             client["prompts"][i] = value
     save_users(users)
-
-    def call_openai(prompt):
+        def call_openai(prompt):
         try:
             openai_client = openai.OpenAI(api_key=api_key)
             response = openai_client.chat.completions.create(
@@ -254,12 +278,3 @@ def geo_tracker_dashboard():
                 file_name=f"Informe_{client['brand']}.pdf",
                 mime="application/pdf"
             )
-
-# --- INICIO ---
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
-
-if st.session_state.authenticated:
-    geo_tracker_dashboard()
-else:
-    login_screen()
