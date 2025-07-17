@@ -9,7 +9,7 @@ import openai
 import re
 from fpdf import FPDF
 from io import BytesIO
-
+ 
 # --- CONFIG GLOBAL ---
 st.set_page_config(page_title="GEO Tracker PRO", layout="wide")
 
